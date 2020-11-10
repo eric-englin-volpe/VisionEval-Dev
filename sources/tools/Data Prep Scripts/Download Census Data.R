@@ -23,11 +23,11 @@ library("dplyr")
 #       https://www.census.gov/prod/techdoc/cbp/cbp95/st-cnty.pdf
 
 counties <- c(059, 600) #enter county codes here
-tracts <- tracts(state = 'VA', county =  counties, cb=TRUE)
+tracts <- tracts(state = 'VA', county =  counties, cb=TRUE) #enter state here
 
 levels <- c('059'= "Fairfax County",'600' = "Fairfax City") #change county codes to county names
-df2 <- data.frame(wxfrom = names(levels), wxto = levels1, stringsAsFactors=FALSE, row.names=NULL)
-tracts <- dplyr::left_join(tracts, df2, by=c("COUNTYFP"="wxfrom"))
+df2 <- data.frame(wxfrom = names(levels), wxto = levels, stringsAsFactors=FALSE, row.names=NULL) #create reference dataframe
+tracts <- dplyr::left_join(tracts, df2, by=c("COUNTYFP"="wxfrom"))#
 tracts$Azone <- tracts$wxto
 tracts$Bzone <- tracts$TRACTCE
 tracts$Czone <- "NA"
