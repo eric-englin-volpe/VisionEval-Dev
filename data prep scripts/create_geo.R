@@ -38,14 +38,14 @@ azone_template = expand.grid(unique(geo$Azone), years)
 colnames(azone_template) = c('Geo', 'Year')
 
 write.csv(azone_template, 
-          file = file.path(root, 'NVTA_Inputs_2020/azone_template'),
+          file = file.path(root, 'NVTA_Inputs_2020/azone_template.csv'),
           row.names = F)
 
 bzone_template = expand.grid(unique(geo$Bzone), years)
 colnames(bzone_template) = c('Geo', 'Year')
 
 write.csv(bzone_template, 
-          file = file.path(root, 'NVTA_Inputs_2020/bzone_template'),
+          file = file.path(root, 'NVTA_Inputs_2020/bzone_template.csv'),
           row.names = F)
 
   
