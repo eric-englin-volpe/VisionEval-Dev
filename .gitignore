@@ -11,3 +11,5 @@ dev/
 docs/
 external/
 Log_*.txt
+census_api.txt
+temp/*
