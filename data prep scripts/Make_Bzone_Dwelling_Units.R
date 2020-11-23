@@ -71,7 +71,7 @@ result <- dwell_units_016 %>% mutate (one_unit = dwell_units_016$estimate, #brin
                                       MFDU = two_unit,
                                       GQDU = 1) %>% 
   mutate(Geo = substr(GEOID, 6, 9)) %>%
-                              select("Geo", "SFDU", "MFDU", "GQDU") #%>% #filter dataframe columns
+                              select("Geo", "SFDU", "MFDU", "GQDU", "GEOID") #%>% #filter dataframe columns
 
 # save tract-based temporary file
 
@@ -92,11 +92,17 @@ rgdal::writeOGR(obj = dwell_units_geo_sp,
 
 TAZ_geometry <- st_read(file.path(input, "FFXsubzone/FFX_Subzone.shp"))
 
+par(mfrow = c(1, 2))
+plot(st_geometry(TAZ_geometry),
+     main = 'TAZ')
+plot(st_geometry(dwell_units_geo), 
+     main = 'Tract')
 
-plot(st_geometry(TAZ_geometry))
-plot(st_geometry(result))
-plot(result['SFDU'])
-plot(TAZ_geometry['SUB_POP15'])
+par(mfrow = c(1, 2))
+plot(TAZ_geometry['SUB_POP15'],
+     main = 'TAZ - population 2015')
+plot(dwell_units_geo['SFDU'],
+     main = 'Tract - SFDU')
 
 
 TAZ_geometry_sp <- as(TAZ_geometry, Class = "Spatial")
