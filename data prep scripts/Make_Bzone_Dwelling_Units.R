@@ -26,6 +26,7 @@ library(leaflet)
 library(readr)
 library(sp)
 library(sf)
+library("rgeos")
 
 # Load Census Data --------------
 # add in census api key
@@ -47,20 +48,15 @@ counties <- c(059, 600, 610) #enter county codes here
 # Dwell units uses census table S1101
 # Full table found at this link: https://api.census.gov/data/2016/acs/acs5/subject/groups/S1101.html
 
-#download raw data
-dwell_units_raw <- get_acs(geography = "tract", table = "S1101",
-                           state = "VA", county = counties, geometry = FALSE)
-
 # Download with geography
 dwell_units_raw <- get_acs(geography = "tract", table = "S1101",
                            state = "VA", county = counties, geometry = TRUE)
 
-
 #filter for our columns
-dwell_units_016 <- dwell_units_raw %>% filter(variable=="S1101_C01_016") # one unit total households
-dwell_units_017 <- dwell_units_raw %>% filter(variable=="S1101_C01_017") # two unit total households
-dwell_units_018 <- dwell_units_raw %>% filter(variable=="S1101_C01_018") # mobile home total households
-dwell_units_total <- dwell_units_raw %>% filter(variable=="S1101_C01_001") # mobile home total households
+dwell_units_016 <- dwell_units_raw %>% filter(variable=="S1101_C01_016") # percent one unit households
+dwell_units_017 <- dwell_units_raw %>% filter(variable=="S1101_C01_017") # percent two unit households
+dwell_units_018 <- dwell_units_raw %>% filter(variable=="S1101_C01_018") # percent mobile home households
+dwell_units_total <- dwell_units_raw %>% filter(variable=="S1101_C01_001") # total households
 
 
 # Make sure all have the same GEOID
@@ -69,23 +65,107 @@ identical(dwell_units_016$GEOID, dwell_units_018$GEOID) &
   identical(dwell_units_016$GEOID, dwell_units_017$GEOID) &
   identical(dwell_units_016$GEOID, dwell_units_total$GEOID)
 
-dwell_units_geo <- dwell_units_016 %>% mutate (one_unit = dwell_units_016$estimate, #bring in the 3 census variables
-                                                   mobile_home = dwell_units_018$estimate,
-                                                   two_unit = dwell_units_017$estimate,
-                                                  total = dwell_units_total$estimate) %>%
-  mutate(SFDU = (one_unit + mobile_home)*total/100, #change census variables to VisionEval variables
-         MFDU = two_unit*total/100,
-         GQDU = 1) %>%
-  mutate(Geo = substr(GEOID, 6, 9)) %>%
-  select("Geo", "SFDU", "MFDU", "GQDU", "GEOID") %>% #filter dataframe columns
-  replace(is.na(.), 0)
+#add all variables into single table, create VisionEval columns
+dwell_units_geo <- dwell_units_016 %>% 
+                        mutate (one_unit = dwell_units_016$estimate, #bring in the 3 census variables
+                                 mobile_home = dwell_units_018$estimate,
+                                 two_unit = dwell_units_017$estimate,
+                                total = dwell_units_total$estimate) %>%
+                        mutate(SFDU = (one_unit + mobile_home)*total/100, #change census variables to VisionEval variables, needs to be actual number of units
+                               MFDU = two_unit*total/100) %>% 
+                        mutate(Geo = substr(GEOID, 6, 9)) %>%
+                        select("Geo", "SFDU", "MFDU",  "GEOID") %>% #filter dataframe columns
+                        replace(is.na(.), 0) #assume all NAs are 0
 
-# Save the tract geography to temp
-dwell_units_geo_sp = as_Spatial(dwell_units_geo)
 
+
+# Clean tract and TAZ geometries --------------
+TAZ_geometry <- st_read(file.path(input, "FFXsubzone/FFX_Subzone.shp")) #load TAZ dataset
+TAZ_geometry_sp <- as(TAZ_geometry, Class = "Spatial")  #make TAZ df into sp 
+dwell_units_geo_sp = as_Spatial(dwell_units_geo) #make tract df into sp 
+
+#change all geometries to USGS project for continuity
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+TAZ_geometry_sp_newproj <- spTransform(TAZ_geometry_sp, CRS = proj.USGS)
+dwell_units_geo_sp_newproj <- spTransform(dwell_units_geo_sp, CRS = proj.USGS)
+
+
+# Find intersection between TAZ and Census Tract polygons --------------
+
+# create and clean up intersect object
+gI <- gIntersection(TAZ_geometry_sp_newproj, dwell_units_geo_sp_newproj, byid=TRUE, drop_lower_td=TRUE) # gIntersection
+n<-names(gI) #grab the ids/names from the gIntersection object
+n<-data.frame(t(data.frame(strsplit(n," ",fixed=TRUE)))) #ids are combined so split into separate cells
+colnames(n)[1:2]<-c("id_TAZ","id_tract") #add id names to differentiate
+
+
+#find the overlapping area for all the TAZ-Tract objects
+n$area<-sapply(gI@polygons, function(x) x@area) 
+a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N)#subset TAZ dataset so only joining TAZ ids
+df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE) #merge the TAZ ids into our dataset
+
+
+#find the total area of every census tract
+df <- df %>%   group_by(id_tract)%>%
+                summarise(shape_area = sum(area))%>%
+                right_join(df, by = "id_tract") 
+        
+
+
+dwell_units_geo$id_tract <- seq.int(nrow(dwell_units_geo)) #make column so we can join census tract df with intersection df
+df2<- merge(df, dwell_units_geo, by = "id_tract", by.y = "id_tract", all.x=TRUE)
+
+# Finalize dataframe -------------------------
+df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in each TAZ
+                   SFDU_this_area = SFDU * share.area, # multiply to get SFDU/MFDU in each intersected polygon
+                   MFDU_this_area = MFDU * share.area) %>% 
+              group_by(TAZ_N)%>%
+              summarise(n = n(),
+                        SFDU = sum(SFDU_this_area), # add up tract-level SFDU/MFDUs for each TAZ 
+                        MFDU = sum(MFDU_this_area)) %>%
+              mutate(Geo = TAZ_N,
+                     GQDU = 1) # no census variable for GQDU. Must use outside data source or assume as 1
+
+
+#duplicate 2019 data for 2045    
+df3_copy <- df3
+df3$Year <- 2019
+df3_copy$Year <- 2045
+
+#make final csv file and save to temp directory
+bzone_dwelling_units_final <- rbind(df3, df3_copy) %>% select("Geo","Year",'SFDU','MFDU','GQDU') 
+write.csv(bzone_dwelling_units_final, file.path(temp, 'bzone_dwelling_units.csv'), row.names = FALSE) #save as csv
+
+
+
+
+
+################################################################################
+# This section is made to save files that may be useful for checking the final output or looking at census tract information
+
+#create final TAZ-level spatial polygon and plot output
+TAZ_geometry_reordered <- TAZ_geometry[order(TAZ_geometry$TAZ_N),]
+df3_geo <-st_set_geometry(df3, TAZ_geometry_reordered$geometry) 
+
+par(mfrow=c(2,1))
+plot(df3_geo['MFDU'],
+     main = 'TAZ - MFDU')
+plot(df3_geo['SFDU'],
+     main = 'TAZ - SFDU')
+
+
+#final TAZ-level output saved as shapefile
+df3_geo_sp = as_Spatial(df3_geo)
+rgdal::writeOGR(obj = df3_geo_sp,
+                dsn = temp,
+                layer = 'TAZ_bzone_dwelling_units',
+                driver = 'ESRI Shapefile')
+
+
+#Tract-level output saved as shapefile
 rgdal::writeOGR(obj = dwell_units_geo_sp,
                 dsn = temp,
-                layer = 'census_tract',
+                layer = 'Tract_bzone_dwelling_units',
                 driver = 'ESRI Shapefile')
 
 
@@ -93,69 +173,10 @@ rgdal::writeOGR(obj = dwell_units_geo_sp,
 dwell_units_no_geo<-st_set_geometry(dwell_units_geo, NULL) #remove geometry field
 write.csv(dwell_units_no_geo, file.path(temp, 'bzone_dwelling_units_by_tract.csv'), row.names = FALSE) #save as csv
 
-
-
-################################################################################################
-
-TAZ_geometry <- st_read(file.path(input, "FFXsubzone/FFX_Subzone.shp")) #load TAZ dataset
+# save TAZ fields as temporary file
 TAZ_geometry_no_geo<-st_set_geometry(TAZ_geometry, NULL) #remove geometry field
 write.csv(TAZ_geometry_no_geo, file.path(temp, 'TAZ_geometry.csv'), row.names = FALSE) #save as csv
 
-TAZ_geometry_sp <- as(TAZ_geometry, Class = "Spatial")
-
-#change all to USGS project for continuity
-proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
-TAZ_geometry_sp_newproj <- spTransform(TAZ_geometry_sp, CRS = proj.USGS)
-dwell_units_geo_sp_newproj <- spTransform(dwell_units_geo_sp, CRS = proj.USGS)
-
-###############################################################################
-library("rgeos")
-
-#gIntersection
-#gIntersection(TAZ_geometry2_sp, results_geo_sp, byid = TRUE)
-gI <- gIntersection(TAZ_geometry_sp_newproj, dwell_units_geo_sp_newproj, byid=TRUE, drop_lower_td=TRUE)
-n<-names(gI)
-n<-data.frame(t(data.frame(strsplit(n," ",fixed=TRUE))))
-colnames(n)[1:2]<-c("id_TAZ","id_tract")
-n$area<-sapply(gI@polygons, function(x) x@area)
-a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N)
-df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE)
-
-side_df <- df %>%   group_by(id_tract)%>%
-                    summarise(n = n(),
-                              shape_area = sum(area))
-            
-df<-merge(df,side_df,by =  "id_tract", all.x=TRUE)
-
-dwell_units_geo$id_tract <- seq.int(nrow(dwell_units_geo))
-df2<- merge(df, dwell_units_geo, by = "id_tract", by.y = "id_tract", all.x=TRUE)
-
-df2 <- df2 %>% mutate(share.area = area/shape_area,
-                   SFDU_this_area = SFDU * share.area,
-                   MFDU_this_area = MFDU * share.area,
-                   GQDU_this_area = GQDU * share.area) 
-
+# save TAZ-tract joined dataframe as temporary file
 df2_no_geo <-df2 %>% select(-'geometry')
 write.csv(df2_no_geo, file.path(temp, 'temp_df2.csv'), row.names = FALSE) #save as csv
-
-df3 <- df2 %>% group_by(TAZ_N)%>%
-              summarise(n = n(),
-                        SFDU = sum(SFDU_this_area),
-                        GQDU = sum(GQDU_this_area),
-                        MFDU = sum(MFDU_this_area))
-    
-
-write.csv(df3, file.path(temp, 'temp_df.csv'), row.names = FALSE) #save as csv
-
-
-TAZ_geometry_reordered <- TAZ_geometry[order(TAZ_geometry$TAZ_N),]
-df3_geo <-st_set_geometry(df3, TAZ_geometry_reordered$geometry) 
-plot(df3_geo['GQDU'],
-     main = 'TAZ - MFDU')
-
-df3_geo_sp = as_Spatial(df3_geo)
-
-rgdal::writeOGR(obj = df3_geo_sp,
-                dsn = temp,
-                layer = 'TAZ',
-                driver = 'ESRI Shapefile')
