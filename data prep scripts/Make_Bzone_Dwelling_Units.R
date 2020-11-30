@@ -127,6 +127,11 @@ df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in eac
                      GQDU = 1) # no census variable for GQDU. Must use outside data source or assume as 1
 
 
+
+# quality check that total SFDUs and MFDUs are same in TAZ and census tract files
+identical(sum(df3$SFDU), sum(dwell_units_geo$SFDU)) &
+  identical(sum(df3$MFDU),sum(dwell_units_geo$MFDU))
+
 #duplicate 2019 data for 2045    
 df3_copy <- df3
 df3$Year <- 2019
