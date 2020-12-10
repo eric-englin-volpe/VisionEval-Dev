@@ -8,7 +8,7 @@
 # File paths
 proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study/'
 
-input = file.path(proj_dir, 'From_VDOT')
+input = file.path(proj_dir, 'Data_to_process')
 
 temp = file.path(getwd(), 'temp')
 if(!dir.exists(temp)){ dir.create(temp)}
@@ -36,7 +36,7 @@ if(!file.exists(fileName)){
   stop(paste('Census API Key needed in as a plain text file in /n', getwd(), '/n go to https://api.census.gov/data/key_signup.html /n and save the API key as `census_api.txt`'))
 }
 
-mystring <- read_file(fileName)
+mystring <- read_file(file.path(input, fileName))
 api_key <- gsub('/r/n', '', mystring) #clean up in case text file has breaks
 
 # load census api key (get one here: https://api.census.gov/data/key_signup.html)
@@ -139,7 +139,7 @@ df3_copy$Year <- 2045
 
 #make final csv file and save to temp directory
 bzone_dwelling_units_final <- rbind(df3, df3_copy) %>% select("Geo","Year",'SFDU','MFDU','GQDU') 
-write.csv(bzone_dwelling_units_final, file.path(temp, 'bzone_dwelling_units.csv'), row.names = FALSE) #save as csv
+write.csv(bzone_dwelling_units_final, file.path(final, 'bzone_dwelling_units.csv'), row.names = FALSE) #save as csv in final directory
 
 
 
