@@ -2,27 +2,22 @@
 
 library(foreign)
 library(tidyverse)
+library(sf)
 
 root = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study'
 
 # create geo.csv
 
-taz <- read.dbf(file.path(root, 'From_VDOT/SUBZDATA_2019.dbf'))
+TAZ_geometry <- st_read(file.path(root, "From_VDOT/FFXsubzone/FFX_Subzone.shp")) #load TAZ dataset
+TAZ<-st_set_geometry(TAZ_geometry, NULL) #remove geometry field
 
-mwcog <- read.dbf(file.path(root, 'From_VDOT/MWCOG_TAZ/TPBTAZ3722_TPBMod.dbf'))
-
-# Counties to use
-use_co = c('Fairfax',
-           'Falls Church',
-           'Fairfax City')
-
-geo = mwcog %>%
-  filter(NAME %in% use_co) %>%
-  select(NAME, TAZ) %>%
+geo = TAZ %>%
+  select(NAME, TAZ_N) %>%
   rename(Azone = NAME,
-         Bzone = TAZ) %>%
+         Bzone = TAZ_N) %>%
   mutate(Czone = NA,
          Marea = "NVTA")
+
 
 
 write.csv(geo, 
