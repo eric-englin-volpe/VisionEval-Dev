@@ -27,6 +27,7 @@ library(readr)
 library(sp)
 library(sf)
 library("rgeos")
+library(rlist)
 
 # Load Census Data --------------
 # add in census api key
@@ -52,6 +53,148 @@ counties <- c(059, 600, 610) #enter county codes here
 hh_income_raw <- get_acs(geography = "tract", table = "B19001",
                            state = "VA", county = counties, geometry = TRUE)
 
+
+counties_geoids <- c(51059, 51600, 51610)
+hh_income_county <- get_acs(geography = "county", table = "B19001",
+                         state = "VA", geometry = FALSE) %>% filter(GEOID %in% counties_geoids)
+
+
+hh_income_one_county <- get_acs(geography = "county", table = "B19001",
+                            state = "VA", geometry = FALSE) %>% filter(GEOID == 51059)
+
+
+hh_income_tract <- get_acs(geography = "tract", table = "B19001",
+                           state = "VA", county = substring(id, 3,), geometry = TRUE)
+
+counties_geoids <- unique(c(hh_income_county$GEOID))
+
+var_list <- c("B19001_002", "B19001_003", "B19001_004", "B19001_005", "B19001_006", "B19001_007", 
+              "B19001_008", "B19001_009", "B19001_010", "B19001_011","B19001_012", "B19001_013", 
+              "B19001_014", "B19001_015", "B19001_016", "B19001_017")
+
+
+estimate_list <- c(10000,14999,19999,24999,29999,34999,39999,44999,49999,59999,74999,99999,124999,149999,199999,200000)
+
+
+
+percentile_q1_num_list = 0
+percentile_q2_num_list = 0
+percentile_q3_num_list = 0
+percentile_q4_num_list = 0
+total_hh_list = 0
+tract_list = 0
+county_list = 0
+
+for (geoid in counties_geoids){
+  print(geoid)
+  total <- hh_income_county %>% filter(GEOID == geoid) %>% filter(variable == "B19001_001") %>% select(estimate)
+  percentile_25 <- total * 0.25
+  percentile_50 <- total * 0.5
+  percentile_75 <- total * 0.75
+  
+  hh_income_one_county <- hh_income_county %>% filter(GEOID == geoid)
+
+  spot_count <- 1
+  count_last <- 0
+  running_count <- 0
+  percentile_25_number<- 0
+  percentile_50_number<- 0
+  percentile_75_number<- 0
+  percentile_25_spot<- 0 
+  percentile_50_spot<- 0 
+  percentile_75_spot<- 0 
+  
+  
+  for (var in var_list){
+    print(var)
+    count <- hh_income_one_county %>% filter(variable == var) %>% select(estimate)
+    running_count <- running_count + count
+    
+    if ((percentile_25_number==0)&(running_count > percentile_25)){
+      count_difference_perc_25 <- (percentile_25 - count_last) / (running_count - count_last) 
+      estimate_difference <- estimate_list[spot_count] - estimate_list[spot_count-1]
+      percentile_25_number <- estimate_difference*count_difference_perc_25+ estimate_list[spot_count-1]
+      percentile_25_spot <- spot_count
+    }
+    if ((percentile_50_number==0)&(running_count > percentile_50)){
+      count_difference_perc_50 <- (percentile_50 - count_last) / (running_count - count_last) 
+      estimate_difference <- estimate_list[spot_count] - estimate_list[spot_count-1]
+      percentile_50_number <- estimate_difference*count_difference_perc_50+ estimate_list[spot_count-1]
+      percentile_50_spot <- spot_count
+    }
+    if ((percentile_75_number==0)&(running_count > percentile_75)){
+      count_difference_perc_75 <- (percentile_75 - count_last) / (running_count - count_last) 
+      estimate_difference <- estimate_list[spot_count] - estimate_list[spot_count-1]
+      percentile_75_number <- estimate_difference*count_difference_perc_75+ estimate_list[spot_count-1]
+      percentile_75_spot <- spot_count
+    }
+    spot_count <- spot_count + 1
+    count_last <- running_count
+    
+  }
+  print(geoid)
+  print(percentile_50_number)
+  
+  hh_income_tract <- get_acs(geography = "tract", table = "B19001",
+                             state = "VA", county = substring(geoid, 3), geometry = FALSE)
+  
+  tract_geoids <- unique(c(hh_income_tract$GEOID))
+  
+  for (tract_geoid in tract_geoids){
+    print(tract_geoid)
+    total_this_tract <- hh_income_tract %>% filter(GEOID == tract_geoid) %>% filter(variable == "B19001_001") %>% select(estimate)
+    hh_income_this_tract <- hh_income_tract %>% filter(GEOID == tract_geoid) %>% filter(variable != "B19001_001") %>% select(estimate)
+    hh_income_this_tract$cumsum <- cumsum(hh_income_this_tract$estimate)
+    percentile_q1_this_tract <- hh_income_this_tract$cumsum[percentile_25_spot-1] + hh_income_this_tract$estimate[percentile_25_spot]* count_difference_perc_25
+    percentile_q2_this_tract <- hh_income_this_tract$cumsum[percentile_50_spot-1] - percentile_q1_this_tract + hh_income_this_tract$estimate[percentile_50_spot]* count_difference_perc_50
+    percentile_q3_this_tract <- hh_income_this_tract$cumsum[percentile_75_spot-1] - percentile_q2_this_tract - percentile_q1_this_tract + hh_income_this_tract$estimate[percentile_75_spot]* count_difference_perc_75
+    percentile_q4_this_tract <- total_this_tract - percentile_q3_this_tract - percentile_q2_this_tract - percentile_q1_this_tract
+    
+    
+    percentile_q1_num_list<- c(percentile_q1_num_list, percentile_q1_this_tract[[1]])
+    percentile_q2_num_list<- c(percentile_q2_num_list, percentile_q2_this_tract[[1]])
+    percentile_q3_num_list<- c(percentile_q3_num_list, percentile_q3_this_tract[[1]])
+    percentile_q4_num_list<- c(percentile_q4_num_list, percentile_q4_this_tract[[1]])
+    tract_list <- c(tract_list, tract_geoid)
+    total_hh_list <- c(total_hh_list, total_this_tract[[1]])
+    county_list <- c(county_list, geoid)
+    
+    
+    
+  }
+  
+}
+
+
+final_df <- data.frame(tract_list, county_list, total_hh_list, percentile_q1_num_list, 
+                       percentile_q2_num_list,percentile_q3_num_list, percentile_q4_num_list)
+
+
+final_df <- final_df %>% mutate(
+  HhPropIncQ1 = percentile_q1_num_list/total_hh_list,
+  HhPropIncQ2 = percentile_q2_num_list/total_hh_list,
+  HhPropIncQ3 = percentile_q3_num_list/total_hh_list,
+  HhPropIncQ4 = percentile_q4_num_list/total_hh_list
+) %>% slice(2:n())
+
+
+
+counties <- c(059, 600, 610) #enter county codes here
+hh_income_raw <- get_acs(geography = "tract", table = "B19001",
+                            state = "VA", county = counties, geometry = TRUE) %>% 
+                  filter(variable == "B19001_001") %>%
+                  select(GEOID)
+                    
+hh_income_raw <- hh_income_raw %>% merge(final_df, by.x = "GEOID", by.y = 'tract_list') 
+
+
+#############################################
+######## IN PROGRESS AFTER THIS POINT #######
+
+
+
+
+#############################################
 #filter for our columns
 dwell_units_016 <- dwell_units_raw %>% filter(variable=="S1101_C01_016") # percent one unit households
 dwell_units_017 <- dwell_units_raw %>% filter(variable=="S1101_C01_017") # percent two unit households
