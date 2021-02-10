@@ -72,6 +72,35 @@ total_hh_list = 0
 tract_list = 0
 county_list = 0
 
+
+########
+## The steps below outline the logic behind the loops and steps to create the final csv file
+#
+# **Azone Level (Steps 1-7)** 
+#Step 1) Download Census data at azone level
+#Step 2) Use variable B19001_001 to find total households in azone
+#Step 3) Find the household number for the 25th, 50th, and 75th percentile in this azone
+#Step 4) Households are bucketed into 16 income categories (B19001_02 to B19001_17). 
+#        Do a running count of the households in each category. 
+#Step 5) Once the running count is more than the 25th, 50th, and 75th percentile household number, 
+#        flag this as the category where the household income number will be. 
+#Step 6) Find the proportion of households in this bucket to calculate the exact 25th, 50th, and 75th percentile household income number. 
+#           Example: 25th percentile household in this azone is flagged in the $50,000 - $59,999 income category. 
+#                    The running count finds that this household is 500 out of the 712 in this income category in the azone. 
+#                     In this case, the 25th percentile income is estimated as: $50,000 + [500/712]*$9,999 = $57,021.77
+#Step 7) For the 25th, 50th, and 75th percentiles, record the income category and the household proportion to calculate bzone-level figures 
+#           Example: Using previous example, the 25th percentile is in the $50,000-$59,999 income category (10th/17 income groups) 
+#                    and the proportion would be 500/712 = 0.7022 
+#
+#
+# **Bzone Level  (Steps 8-13)** 
+#Step 8) Download Census data for all bzones in this azone
+#Step 9) Use the income category and household proportions to find the number of bzone households in each quartile using the azone boundaries
+#Step 10) Add this information to a series of lists that will be combined into a complete dataframe
+#Step 11) Repeat for all azones
+#Step 12) [OPTIONAL] Convert the bzone dataset into a different geography level if needed
+#Step 13) Save as bzone_hh_inc_qrtl_prop.csv
+
 for (geoid in counties_geoids){
   print(geoid) #print statement to track loop count
   total <- hh_income_county %>% filter(GEOID == geoid) %>% filter(variable == "B19001_001") %>% select(estimate)
