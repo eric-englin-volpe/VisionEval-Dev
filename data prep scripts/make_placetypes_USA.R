@@ -25,7 +25,7 @@ proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05
 
 input = file.path(proj_dir, 'Data_to_process')
 
-temp = file.path(getwd(), 'temp')
+temp = file.path(getwd(), './../temp')
 if(!dir.exists(temp)){ dir.create(temp)}
 
 final = file.path(proj_dir, 'NVTA_Inputs_2020/inputs')
