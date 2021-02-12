@@ -1,0 +1,197 @@
+#===========
+#make_placetypes_USA.R
+#===========
+
+# This script will create all data inputs that use Placetypes_USA/EPA Smart Locations Database as the data source
+# Input files: 
+#       - bzone_employment.csv 
+#       - bzone_unprotected_area.csv 
+#       - bzone_network_design.csv 
+#       - bzone_transit_service.csv 
+
+#       - marea_d4bpo4_adj.csv
+#       - marea_mix_targets.csv 
+#       - marea_travel-demand-mgt_by_area-type.csv
+#       - marea_parking-avail_by_area-type.csv
+#       - marea_parking-cost_by_area-type.csv
+
+
+#load 2010 EPA smart location dataset
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+load("./data/Sld_df.Rda")
+
+# File paths
+proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study/'
+
+input = file.path(proj_dir, 'Data_to_process')
+
+temp = file.path(getwd(), 'temp')
+if(!dir.exists(temp)){ dir.create(temp)}
+
+final = file.path(proj_dir, 'NVTA_Inputs_2020/inputs')
+
+# Install/Load libraries --------------
+source('data prep scripts/get_packages.R')
+
+library(dplyr)
+library(tidyverse)
+library(tidycensus)
+library(viridis)
+library(leaflet)
+library(readr)
+library(sp)
+library(sf)
+library("rgeos")
+
+
+# Load Census Data --------------
+# add in census api key
+fileName <- 'census_api.txt'
+
+if(!file.exists(fileName)){
+  stop(paste('Census API Key needed in as a plain text file in /n', getwd(), '/n go to https://api.census.gov/data/key_signup.html /n and save the API key as `census_api.txt`'))
+}
+
+mystring <- read_file(file.path(input, fileName))
+api_key <- gsub('/r/n', '', mystring) #clean up in case text file has breaks
+
+# load census api key (get one here: https://api.census.gov/data/key_signup.html)
+census_api_key(api_key, install = TRUE)
+readRenviron("~/.Renviron") # will check R environment for past api keys
+
+# load census tract data
+counties <- c(059, 600, 610) #enter county codes here
+# Dwell units uses census table S1101
+# Full table found at this link: https://api.census.gov/data/2016/acs/acs5/subject/groups/S1101.html
+
+# Download with geography
+block_groups <- get_acs(geography = "block group",variables = "B19013_001",year=2010, 
+                           state = "VA", county = counties, geometry = TRUE) %>%
+                        select(GEOID, NAME)
+
+Sld_df_filtered <- Sld_df %>% filter(GEOID10 %in% block_groups$GEOID) %>% # filter for our Census block groups
+                          select(GEOID10, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4) %>% 
+                          mutate(GEOID = GEOID10) %>% 
+                          merge(block_groups, by = "GEOID")
+
+
+block_groups_Sld <- block_groups %>% merge(Sld_df, by.x = "GEOID", by.y = "GEOID10") %>% # filter for our Census block groups
+  select(GEOID, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4) 
+  
+
+
+
+
+
+# Clean tract and TAZ geometries --------------
+TAZ_geometry <- st_read(file.path(input, "FFXsubzone/FFX_Subzone.shp")) #load TAZ dataset
+TAZ_geometry_sp <- as(TAZ_geometry, Class = "Spatial")  #make TAZ df into sp 
+block_groups_Sld_sp = as_Spatial(block_groups_Sld) #make tract df into sp 
+
+#change all geometries to USGS project for continuity
+proj.USGS <- "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0"
+TAZ_geometry_sp_newproj <- spTransform(TAZ_geometry_sp, CRS = proj.USGS)
+block_groups_Sld_sp_newproj <- spTransform(block_groups_Sld_sp, CRS = proj.USGS)
+
+
+# Find intersection between TAZ and Census Tract polygons --------------
+
+# create and clean up intersect object
+gI <- gIntersection(TAZ_geometry_sp_newproj, block_groups_Sld_sp_newproj, byid=TRUE, drop_lower_td=TRUE) # gIntersection
+n<-names(gI) #grab the ids/names from the gIntersection object
+n<-data.frame(t(data.frame(strsplit(n," ",fixed=TRUE)))) #ids are combined so split into separate cells
+colnames(n)[1:2]<-c("id_TAZ","id_blockgroup") #add id names to differentiate
+
+
+#find the overlapping area for all the TAZ-Tract objects
+n$area<-sapply(gI@polygons, function(x) x@area) 
+a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N)#subset TAZ dataset so only joining TAZ ids
+df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE) #merge the TAZ ids into our dataset
+
+
+#find the total area of every census tract
+df <- df %>%   group_by(id_blockgroup)%>%
+  summarise(shape_area = sum(area))%>%
+  right_join(df, by = "id_blockgroup") 
+
+
+
+block_groups_Sld$id_blockgroup <- seq.int(nrow(block_groups_Sld)) #make column so we can join census tract df with intersection df
+df2<- merge(df, block_groups_Sld, by = "id_blockgroup", by.y = "id_blockgroup", all.x=TRUE)
+
+# Finalize dataframe -------------------------
+df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in each TAZ
+                      EMPTOT_this_area = EMPTOT * share.area, # bzone_employment
+                      E5_RET10_this_area = E5_RET10 * share.area, # bzone_employment
+                      E5_SVC10_this_area = E5_SVC10 * share.area, # bzone_employment
+                      AC_LAND_this_area = AC_LAND * share.area, # bzone_unprotected_area
+                      D4c_this_area = D4c * share.area, # bzone_transit
+                      D3bpo4_this_area = D3bpo4 * share.area) %>% #bzone_network
+  group_by(TAZ_N)%>%
+  summarise(n = n(),
+            TotEmp = sum(EMPTOT_this_area), # employment 
+            RetEmp = sum(E5_RET10_this_area), # employment 
+            SvcEmp = sum(E5_SVC10_this_area), # employment 
+            AC_LAND = sum(AC_LAND_this_area), # unprotected areas 
+            D4c = sum(D4c_this_area), # transit 
+            D3bpo4 = sum(D3bpo4_this_area)) %>%
+  mutate(Geo = TAZ_N) 
+
+
+
+#duplicate 2019 data for 2045    
+df3_copy <- df3
+df3$Year <- 2019
+df3_copy$Year <- 2045
+
+#make final csv file and save to temp directory
+bzone_employment <- rbind(df3, df3_copy) %>% select("Geo","Year",'TotEmp','RetEmp','SvcEmp') 
+write.csv(bzone_employment, file.path(final, 'bzone_employment.csv'), row.names = FALSE) #save as csv in final directory
+
+#Under Construction#
+#bzone_unprotected_area <- rbind(df3, df3_copy) %>% select("Geo","Year",'AC_LAND') 
+#write.csv(bzone_unprotected_area, file.path(final, 'bzone_unprotected_area.csv'), row.names = FALSE) #save as csv in final directory
+
+
+bzone_transit <- rbind(df3, df3_copy) %>% select("Geo","Year",'D4c') 
+write.csv(bzone_transit, file.path(final, 'bzone_transit.csv'), row.names = FALSE) #save as csv in final directory
+
+
+bzone_network_design <- rbind(df3, df3_copy) %>% select("Geo","Year",'D3bpo4',"n") 
+write.csv(bzone_network_design, file.path(final, 'bzone_network_design.csv'), row.names = FALSE) #save as csv in final directory
+
+
+
+df2_no_geo<-df2 %>% select(-"geometry")
+
+write.csv(df2_no_geo, file.path(final, 'smart_locations_database_raw.csv'), row.names = FALSE) #save as csv in final directory
+
+
+
+################################################################################
+# This section is made to save files that may be useful for checking the final output or looking at census tract information
+
+#create final TAZ-level spatial polygon and plot output
+TAZ_geometry_reordered <- TAZ_geometry[order(TAZ_geometry$TAZ_N),]
+df3_geo <-st_set_geometry(df3, TAZ_geometry_reordered$geometry) 
+
+par(mfrow=c(2,1))
+plot(df3_geo['D3bpo4'],
+     main = 'TAZ - D3bpo4')
+plot(df3_geo['D3bpo4'],
+     main = 'TAZ - D3bpo4')
+
+
+#final TAZ-level output saved as shapefile
+df3_geo_sp = as_Spatial(df3_geo)
+rgdal::writeOGR(obj = df3_geo_sp,
+                dsn = temp,
+                layer = 'TAZ_bzone_network_design',
+                driver = 'ESRI Shapefile')
+
+
+#Tract-level output saved as shapefile
+rgdal::writeOGR(obj = block_groups_Sld_sp,
+                dsn = temp,
+                layer = 'BlockGroup_bzone_network_design',
+                driver = 'ESRI Shapefile')
