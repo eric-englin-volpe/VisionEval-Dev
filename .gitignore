@@ -13,3 +13,21 @@ external/
 Log_*.txt
 census_api.txt
 temp/*
+data prep scripts/temp/BlockGroup_bzone_network_design.shp
+data prep scripts/temp/BlockGroup_bzone_network_design.prj
+data prep scripts/temp/BlockGroup_bzone_network_design.dbf
+data prep scripts/temp/BlockGroup_bzone_network_design.shp.VOLSLBOS-44176.12996.5928.sr.lock
+data prep scripts/temp/BlockGroup_bzone_network_design.shp.VOLSLBOS-44176.16540.5928.sr.lock
+data prep scripts/temp/BlockGroup_bzone_network_design.shp.VOLSLBOS-44176.16540.rd.lock
+data prep scripts/temp/BlockGroup_bzone_network_design.shp.VOLSLBOS-44176.18176.5928.sr.lock
+data prep scripts/temp/BlockGroup_bzone_network_design.shp.VOLSLBOS-44176.18180.5928.sr.lock
+data prep scripts/temp/BlockGroup_bzone_network_design.shx
+data prep scripts/temp/TAZ_bzone_network_design.dbf
+data prep scripts/temp/TAZ_bzone_network_design.prj
+data prep scripts/temp/TAZ_bzone_network_design.shp
+data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.12996.5928.sr.lock
+data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.16540.5928.sr.lock
+data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.16540.rd.lock
+data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.18176.5928.sr.lock
+data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.18180.5928.sr.lock
+data prep scripts/temp/TAZ_bzone_network_design.shx
