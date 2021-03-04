@@ -65,7 +65,7 @@ counties <- c(059, 600, 610) #enter county codes here
 # Full table found at this link: https://api.census.gov/data/2016/acs/acs5/subject/groups/S1101.html
 
 # Download with geography
-block_groups <- get_acs(geography = "block group",variables = "B19013_001",year=2010, 
+block_groups <- get_acs(geography = "block group",variables = "B01003_001",year=2013, 
                            state = "VA", county = counties, geometry = TRUE) %>%
                         select(GEOID, NAME)
 
@@ -111,22 +111,28 @@ df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE) #merge the TAZ ids into 
 
 #find the total area of every census tract
 df <- df %>%   group_by(id_blockgroup)%>%
-  summarise(shape_area = sum(area))%>%
+  summarise(blockgroup_area = sum(area))%>%
   right_join(df, by = "id_blockgroup") 
 
 
+df_interim <- df %>% group_by(TAZ_N)%>%
+  summarise(taz_area = sum(area)) %>%
+  right_join(df, by = "TAZ_N") 
+
 
 block_groups_Sld$id_blockgroup <- seq.int(nrow(block_groups_Sld)) #make column so we can join census tract df with intersection df
-df2<- merge(df, block_groups_Sld, by = "id_blockgroup", by.y = "id_blockgroup", all.x=TRUE)
+df2<- merge(df_interim, block_groups_Sld, by = "id_blockgroup", by.y = "id_blockgroup", all.x=TRUE)
+
 
 # Finalize dataframe -------------------------
-df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in each TAZ
-                      EMPTOT_this_area = EMPTOT * share.area, # bzone_employment
-                      E5_RET10_this_area = E5_RET10 * share.area, # bzone_employment
-                      E5_SVC10_this_area = E5_SVC10 * share.area, # bzone_employment
-                      AC_LAND_this_area = AC_LAND * share.area, # bzone_unprotected_area
-                      D4c_this_area = D4c * share.area, # bzone_transit
-                      D3bpo4_this_area = D3bpo4 * share.area) %>% #bzone_network
+df3 <- df2 %>% mutate(share_area_by_blockgroup = area/blockgroup_area, #calculate % of block group in each TAZ (use for count-based metrics)
+                      share_area_by_TAZ = area/taz_area, #calculate % of block group that makes up each TAZ (use for rate-based metrics)
+                      EMPTOT_this_area = EMPTOT * share_area_by_blockgroup, # bzone_employment
+                      E5_RET10_this_area = E5_RET10 * share_area_by_blockgroup, # bzone_employment
+                      E5_SVC10_this_area = E5_SVC10 * share_area_by_blockgroup, # bzone_employment
+                      AC_LAND_this_area = AC_LAND * share_area_by_blockgroup, # bzone_unprotected_area
+                      D4c_this_area = D4c * share_area_by_TAZ, # bzone_transit
+                      D3bpo4_this_area = D3bpo4 * share_area_by_TAZ) %>% #bzone_network
   group_by(TAZ_N)%>%
   summarise(n = n(),
             TotEmp = sum(EMPTOT_this_area), # employment 
@@ -136,7 +142,6 @@ df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in eac
             D4c = sum(D4c_this_area), # transit 
             D3bpo4 = sum(D3bpo4_this_area)) %>%
   mutate(Geo = TAZ_N) 
-
 
 
 #duplicate 2019 data for 2045    
@@ -182,6 +187,8 @@ plot(df3_geo['D3bpo4'],
      main = 'TAZ - D3bpo4')
 
 
+
+
 #final TAZ-level output saved as shapefile
 df3_geo_sp = as_Spatial(df3_geo)
 rgdal::writeOGR(obj = df3_geo_sp,
@@ -195,3 +202,7 @@ rgdal::writeOGR(obj = block_groups_Sld_sp,
                 dsn = temp,
                 layer = 'BlockGroup_bzone_network_design',
                 driver = 'ESRI Shapefile')
+
+
+
+
