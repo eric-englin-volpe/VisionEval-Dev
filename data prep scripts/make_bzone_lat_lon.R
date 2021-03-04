@@ -55,7 +55,7 @@ bzone_lat_lon_copy$Year <- 2045
 
 #make final csv file and save to temp directory
 bzone_lat_lon_final <- rbind(bzone_lat_lon, bzone_lat_lon_copy)  
-write.csv(bzone_lat_lon_final, file.path(final, 'bzone_lat_long.csv'), row.names = FALSE) #save as csv in final directory
+write.csv(bzone_lat_lon_final, file.path(final, 'bzone_lat_lon.csv'), row.names = FALSE) #save as csv in final directory
 
 
 
