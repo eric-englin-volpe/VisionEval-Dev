@@ -59,8 +59,9 @@ write.csv(bzone_lat_lon_final, file.path(final, 'bzone_lat_lon.csv'), row.names 
 
 
 
+################################################################################
 
-# check centroids
+# This section makes a plot to check if the centroids visually look like they are in the correct spot. 
 TAZ_geometry <- st_transform(TAZ_geometry, 4326)
 plot(st_geometry(TAZ_geometry))
 #plot(TAZ_geometry[, 'centroids'], add = T, col = 'red', pch = 19)

@@ -162,7 +162,7 @@ bzone_transit <- rbind(df3, df3_copy) %>% select("Geo","Year",'D4c')
 write.csv(bzone_transit, file.path(final, 'bzone_transit.csv'), row.names = FALSE) #save as csv in final directory
 
 
-bzone_network_design <- rbind(df3, df3_copy) %>% select("Geo","Year",'D3bpo4',"n") 
+bzone_network_design <- rbind(df3, df3_copy) %>% select("Geo","Year",'D3bpo4') 
 write.csv(bzone_network_design, file.path(final, 'bzone_network_design.csv'), row.names = FALSE) #save as csv in final directory
 
 
