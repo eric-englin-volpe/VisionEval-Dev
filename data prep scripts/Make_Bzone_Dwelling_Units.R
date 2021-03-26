@@ -101,7 +101,9 @@ colnames(n)[1:2]<-c("id_TAZ","id_tract") #add id names to differentiate
 
 #find the overlapping area for all the TAZ-Tract objects
 n$area<-sapply(gI@polygons, function(x) x@area) 
-a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N)#subset TAZ dataset so only joining TAZ ids
+a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N, 
+              SUB_POP15 = TAZ_geometry_sp_newproj$SUB_POP15, SUB_POP40= TAZ_geometry_sp_newproj$SUB_POP40, # note that these columns are needed to find urban rural classifications
+              SQMI = TAZ_geometry_sp_newproj$SQMI_FXTAZ)#subset TAZ dataset so only joining TAZ ids
 df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE) #merge the TAZ ids into our dataset
 
 
@@ -122,7 +124,10 @@ df3 <- df2 %>% mutate(share.area = area/shape_area, #calculate % of tract in eac
               group_by(TAZ_N)%>%
               summarise(n = n(),
                         SFDU = sum(SFDU_this_area), # add up tract-level SFDU/MFDUs for each TAZ 
-                        MFDU = sum(MFDU_this_area)) %>%
+                        MFDU = sum(MFDU_this_area),
+                        SQMI = mean(SQMI),
+                        SUB_POP15 = mean (SUB_POP15),
+                        SUB_POP40 = mean(SUB_POP40)) %>%
               mutate(Geo = TAZ_N,
                      GQDU = 1) # no census variable for GQDU. Must use outside data source or assume as 1
 
@@ -137,11 +142,38 @@ df3_copy <- df3
 df3$Year <- 2019
 df3_copy$Year <- 2045
 
+df3 <- df3 %>% mutate(
+  Pop_Density = SUB_POP15 / SQMI
+) %>% 
+  mutate(
+    Rural = ifelse(Pop_Density<161, 1, 0),
+    Town = ifelse(Pop_Density<1241 & Pop_Density>161, 1, 0),
+    Urban = ifelse(Pop_Density>1241, 1, 0)
+  )
+
+df3_copy <- df3_copy %>% mutate(
+  Pop_Density = SUB_POP40 / SQMI
+) %>% 
+  mutate(
+    Rural = ifelse(Pop_Density<161, 1, 0),
+    Town = ifelse(Pop_Density<1241 & Pop_Density>161, 1, 0),
+    Urban = ifelse(Pop_Density>1241, 1, 0)
+  )
+
+
 #make final csv file and save to temp directory
 bzone_dwelling_units_final <- rbind(df3, df3_copy) %>% select("Geo","Year",'SFDU','MFDU','GQDU') 
 write.csv(bzone_dwelling_units_final, file.path(final, 'bzone_dwelling_units.csv'), row.names = FALSE) #save as csv in final directory
 
 
+bzone_dwelling_units_urban_town_du <- rbind(df3, df3_copy) %>% select("Geo","Year",'SFDU','MFDU','GQDU', 'Rural', 'Town', 'Urban') %>% 
+  mutate(PropUrbanSFDU = SFDU * Urban,
+         PropUrbanMFDU = MFDU * Urban,
+         PropUrbanGQDU = GQDU * Urban,
+         PropTownSFDU = SFDU * Town,
+         PropTownMFDU = MFDU * Town,
+         PropTownGQDU = GQDU * Town) %>% select("Geo", "Year", "PropUrbanSFDU","PropUrbanMFDU","PropUrbanGQDU",'PropTownSFDU', 'PropTownMFDU', 'PropTownGQDU')
+write.csv(bzone_dwelling_units_urban_town_du, file.path(final, 'bzone_urban-town_du_proportions.csv'), row.names = FALSE) #save as csv in final directory
 
 
 
