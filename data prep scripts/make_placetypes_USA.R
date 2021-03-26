@@ -9,6 +9,7 @@
 #       - bzone_network_design.csv 
 #       - bzone_transit_service.csv 
 
+# Note that 5 marea input files are also listed here but these are not necessary for the final inputs:
 #       - marea_d4bpo4_adj.csv
 #       - marea_mix_targets.csv 
 #       - marea_travel-demand-mgt_by_area-type.csv
@@ -22,6 +23,7 @@ load("./data/Sld_df.Rda")
 
 # File paths
 proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study/'
+
 
 input = file.path(proj_dir, 'Data_to_process')
 
@@ -70,13 +72,13 @@ block_groups <- get_acs(geography = "block group",variables = "B01003_001",year=
                         select(GEOID, NAME)
 
 Sld_df_filtered <- Sld_df %>% filter(GEOID10 %in% block_groups$GEOID) %>% # filter for our Census block groups
-                          select(GEOID10, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4) %>% 
+                          select(GEOID10, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4, AC_TOT, AC_WATER, AC_UNPR) %>% 
                           mutate(GEOID = GEOID10) %>% 
                           merge(block_groups, by = "GEOID")
 
 
 block_groups_Sld <- block_groups %>% merge(Sld_df, by.x = "GEOID", by.y = "GEOID10") %>% # filter for our Census block groups
-  select(GEOID, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4) 
+  select(GEOID, EMPTOT, E5_RET10, E5_SVC10,AC_LAND, D4c, D3bpo4, AC_TOT, AC_WATER, AC_UNPR) 
   
 
 
@@ -105,7 +107,10 @@ colnames(n)[1:2]<-c("id_TAZ","id_blockgroup") #add id names to differentiate
 
 #find the overlapping area for all the TAZ-Tract objects
 n$area<-sapply(gI@polygons, function(x) x@area) 
-a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N)#subset TAZ dataset so only joining TAZ ids
+a<-data.frame(id=row.names(TAZ_geometry_sp_newproj), TAZ_N = TAZ_geometry_sp_newproj$TAZ_N, 
+                  SUB_POP15 = TAZ_geometry_sp_newproj$SUB_POP15, SUB_POP40= TAZ_geometry_sp_newproj$SUB_POP40, # note that these columns are needed to find urban rural classifications
+                  SQMI = TAZ_geometry_sp_newproj$SQMI_FXTAZ
+              )#subset TAZ dataset so only joining TAZ ids
 df<-merge(n,a,by.x = "id_TAZ", by.y = "id", all.x=TRUE) #merge the TAZ ids into our dataset
 
 
@@ -130,7 +135,8 @@ df3 <- df2 %>% mutate(share_area_by_blockgroup = area/blockgroup_area, #calculat
                       EMPTOT_this_area = EMPTOT * share_area_by_blockgroup, # bzone_employment
                       E5_RET10_this_area = E5_RET10 * share_area_by_blockgroup, # bzone_employment
                       E5_SVC10_this_area = E5_SVC10 * share_area_by_blockgroup, # bzone_employment
-                      AC_LAND_this_area = AC_LAND * share_area_by_blockgroup, # bzone_unprotected_area
+                      AC_LAND_this_area = AC_LAND * share_area_by_blockgroup, # bzone_unprotected_area - old method
+                      AC_UNPR_this_area = AC_UNPR * share_area_by_blockgroup, # bzone_unprotected_area - new method
                       D4c_this_area = D4c * share_area_by_TAZ, # bzone_transit
                       D3bpo4_this_area = D3bpo4 * share_area_by_TAZ) %>% #bzone_network
   group_by(TAZ_N)%>%
@@ -138,24 +144,65 @@ df3 <- df2 %>% mutate(share_area_by_blockgroup = area/blockgroup_area, #calculat
             TotEmp = sum(EMPTOT_this_area), # employment 
             RetEmp = sum(E5_RET10_this_area), # employment 
             SvcEmp = sum(E5_SVC10_this_area), # employment 
-            AC_LAND = sum(AC_LAND_this_area), # unprotected areas 
+            AC_LAND = sum(AC_LAND_this_area), # unprotected areas - old method
+            AC_UNPR = sum(AC_UNPR_this_area), # unprotected areas  - new method
             D4c = sum(D4c_this_area), # transit 
-            D3bpo4 = sum(D3bpo4_this_area)) %>%
+            D3bpo4 = sum(D3bpo4_this_area),
+            SQMI = mean(SQMI),
+            SUB_POP15 = mean (SUB_POP15),
+            SUB_POP40 = mean(SUB_POP40)) %>%
   mutate(Geo = TAZ_N) 
+
+
+#df3 <- df3 %>% mutate(
+#  Pop_Density_15 = SUB_POP15 / SQMI,
+#  Pop_Density_40 = SUB_POP40 / SQMI
+#) %>% 
+#  mutate(
+#    Rural_15 = ifelse(Pop_Density_15<161, 1, 0),
+#    Rural_40 = ifelse(Pop_Density_40<161, 1, 0),
+#    Town_15 = ifelse(Pop_Density_15<1241 & Pop_Density_15>161, 1, 0),
+#    Town_40 = ifelse(Pop_Density_40<1241 & Pop_Density_40>161, 1, 0),
+#    Urban_15 = ifelse(Pop_Density_15>1241, 1, 0),
+#    Urban_40 = ifelse(Pop_Density_40>1241, 1, 0)
+#    )
 
 
 #duplicate 2019 data for 2045    
 df3_copy <- df3
+
 df3$Year <- 2019
 df3_copy$Year <- 2045
+
+df3 <- df3 %>% mutate(
+  Pop_Density = SUB_POP15 / SQMI
+) %>% 
+  mutate(
+    Rural = ifelse(Pop_Density<161, 1, 0),
+    Town = ifelse(Pop_Density<1241 & Pop_Density>161, 1, 0),
+    Urban = ifelse(Pop_Density>1241, 1, 0)
+  )
+
+df3_copy <- df3_copy %>% mutate(
+  Pop_Density = SUB_POP40 / SQMI
+) %>% 
+  mutate(
+    Rural = ifelse(Pop_Density<161, 1, 0),
+    Town = ifelse(Pop_Density<1241 & Pop_Density>161, 1, 0),
+    Urban = ifelse(Pop_Density>1241, 1, 0)
+  )
+
 
 #make final csv file and save to temp directory
 bzone_employment <- rbind(df3, df3_copy) %>% select("Geo","Year",'TotEmp','RetEmp','SvcEmp') 
 write.csv(bzone_employment, file.path(final, 'bzone_employment.csv'), row.names = FALSE) #save as csv in final directory
 
 #Under Construction#
-#bzone_unprotected_area <- rbind(df3, df3_copy) %>% select("Geo","Year",'AC_LAND') 
-#write.csv(bzone_unprotected_area, file.path(final, 'bzone_unprotected_area.csv'), row.names = FALSE) #save as csv in final directory
+bzone_unprotected_area <- rbind(df3, df3_copy) %>% select("Geo","Year",'AC_UNPR', 'Rural', 'Town', 'Urban') %>% 
+  mutate(UrbanArea = AC_UNPR * Urban,
+         TownArea = AC_UNPR * Town,
+         RuralArea = AC_UNPR * Rural) %>% select("Geo", "Year", "UrbanArea","TownArea","RuralArea")
+write.csv(bzone_unprotected_area, file.path(final, 'bzone_unprotected_area.csv'), row.names = FALSE) #save as csv in final directory
 
 
 bzone_transit <- rbind(df3, df3_copy) %>% select("Geo","Year",'D4c') 
