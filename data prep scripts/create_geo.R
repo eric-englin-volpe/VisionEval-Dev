@@ -9,7 +9,7 @@ root = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16
 # create geo.csv
 
 TAZ_geometry <- st_read(file.path(root, "From_VDOT/FFXsubzone/FFX_Subzone.shp")) #load TAZ dataset
-TAZ<-st_set_geometry(TAZ_geometry, NULL) #remove geometry field
+TAZ <- st_set_geometry(TAZ_geometry, NULL) #remove geometry field
 
 geo = TAZ %>%
   select(NAME, TAZ_N) %>%
@@ -17,8 +17,6 @@ geo = TAZ %>%
          Bzone = TAZ_N) %>%
   mutate(Czone = NA,
          Marea = "NVTA")
-
-
 
 write.csv(geo, 
           file = file.path(root, 'NVTA_Inputs_2020/defs/geo.csv'),

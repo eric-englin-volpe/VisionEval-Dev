@@ -35,8 +35,6 @@
 # Then check to see if the named file (e.g., azone_hh_veh_age_mean.csv) has already been updated (does it have the default Rogue Valley MPO geo names, or not?). If not, proceed
 # Then join in the default columns, repeating for the base and future years for each zone as necessary.
 
-
-
 # File paths
 proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study/'
 
