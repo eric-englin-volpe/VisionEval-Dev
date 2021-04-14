@@ -10,6 +10,7 @@ library(ggplot2)
 proj_dir = '//vntscex/dfs/Projects/PROJ-HW32A1/Task 2.9 - SHRP/SHRP2 C10-C04-C05-C16/Implementation/VisionEval/VDOT_Case_Study/NVTA_Inputs_2020'
 
 input = file.path(proj_dir, 'Data to Process')
+final = file.path(proj_dir, 'inputs')
 
 
 # Check to see if geo.csv exists; read marea from geo
@@ -123,8 +124,30 @@ if(MAKEMAPS){
 # ArtLaneMie is F_System 2-4
 # need to clip to urban areas -- here all is urban
 
+miles_per_meter = 0.000621371
 
+# Freeway
 hpms_marea_fwy = hpms_marea[hpms_marea$F_System == 1,]
 
-sum(st_length(hpms_marea_fwy)) * 0.00621371
+lengths = st_length(hpms_marea_fwy)
+lanes = hpms_marea_fwy$Through_La
 
+FwyLaneMi = sum(lengths * lanes) * miles_per_meter
+
+# Arterial
+hpms_marea_art = hpms_marea[hpms_marea$F_System %in% c(2, 3, 4),]
+
+lengths = st_length(hpms_marea_art)
+lanes = hpms_marea_art$Through_La
+
+ArtLaneMi = sum(lengths * lanes) * miles_per_meter
+
+# Write out ---
+
+lane_miles = data.frame(Geo = rep('NVTA', 2),
+                         Year = c('2019', '2045'),
+                         FwyLaneMi = rep(round(as.numeric(FwyLaneMi), 0), 2),
+                         ArtLaneMi= rep(round(as.numeric(ArtLaneMi), 0), 2))
+
+write.csv(lane_miles, file = file.path(final, 'marea_lane_miles.csv'),
+          row.names = F)
