@@ -33,3 +33,9 @@ data prep scripts/temp/TAZ_bzone_network_design.shp.VOLSLBOS-44176.18180.5928.sr
 data prep scripts/temp/TAZ_bzone_network_design.shx
 HPMS_virginia_2017.RData
 Virginia2017.cpg
+*.dbf
+*.shx
+*.shp
+*.sbx
+*.sbn
+*.prj
