@@ -1,0 +1,11 @@
+{
+  "Model": "NVTA - VERSPM Scenarios",
+  "Scenario": "Fairfax Base",
+  "Description": "VERSPM for Fairfax County",
+  "Region": "NVTA",
+  "BaseYear": "2045",
+  "Years": ["2045"],
+  "DatastoreName": "Datastore",
+  "DatastoreType": "RD",
+  "Seed": 1
+}

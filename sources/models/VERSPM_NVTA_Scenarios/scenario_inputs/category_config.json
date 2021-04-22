@@ -1,0 +1,50 @@
+[
+  {
+    "NAME": "Population growth",
+    "DESCRIPTION": "Growth of population at the TAZ level with more growth in western areas.",
+    "LEVELS":[
+      {
+        "NAME": "1",
+        "INPUTS":[
+          {
+            "NAME": "A",
+            "LEVEL": "1"
+          }
+        ]
+      },
+      {
+        "NAME": "2",
+        "INPUTS":[
+          {
+            "NAME": "A",
+            "LEVEL": "2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "NAME": "Employment growth",
+    "DESCRIPTION": "Higher growth of employment at the TAZ level with more growth in the western areas.",
+    "LEVELS":[
+      {
+        "NAME": "1",
+        "INPUTS":[
+          {
+            "NAME": "B",
+            "LEVEL": "1"
+          }
+		  ]
+      },
+	  {
+        "NAME": "2",
+        "INPUTS":[
+          {
+            "NAME": "B",
+            "LEVEL": "2"
+          }
+        ]
+      }
+    ]
+  }
+]

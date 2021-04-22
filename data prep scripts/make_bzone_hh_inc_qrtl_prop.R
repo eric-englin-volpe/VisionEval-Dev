@@ -26,7 +26,7 @@ library(leaflet)
 library(readr)
 library(sp)
 library(sf)
-library("rgeos")
+library(rgeos)
 library(rlist)
 
 # Load Census Data --------------

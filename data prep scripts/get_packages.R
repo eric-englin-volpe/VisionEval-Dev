@@ -3,6 +3,8 @@
 
 loadpacks <- c(
   'dplyr', 
+  'rgeos',
+  'rlist',
   'tidyverse', 
   'tidycensus', 
   'viridis', 

@@ -1,0 +1,38 @@
+[
+  {
+    "NAME": "A",
+    "LABEL": "1a. Population growth",
+    "DESCRIPTION": "High growth in selected Bzones",
+    "INSTRUCTIONS": "Keep all three Azone households constant.  For Bzones, compute growth (2045-2019) households (bzone_dwelling_units.csv).  Move some household growth from east to west such that, at the Bzone level, the average percent difference from baseline values is 48%.",
+    "LEVELS":[
+      {
+        "NAME": "1",
+        "LABEL": "Base",
+        "DESCRIPTION": "Current household growth"
+      },
+      {
+        "NAME": "2",
+        "LABEL": "High growth",
+        "DESCRIPTION": "Higher household growth in selected bzones with average percent difference from baseline of 48%"
+      }
+    ]
+  },
+  {
+    "NAME": "B",
+    "LABEL": "1b. Employment growth",
+    "DESCRIPTION": "",
+    "INSTRUCTIONS": "Increase growth ein employment so the target average percent difference at the Bzone level is 136%.",
+    "LEVELS":[
+      {
+        "NAME": "1",
+        "LABEL": "Base",
+        "DESCRIPTION": "Existing level"
+      },
+      {
+        "NAME": "2",
+        "LABEL": "High growth",
+        "DESCRIPTION": "Higher employment growth in selected bzones with average percent difference from baseline of 136%"
+      }
+    ]
+  }
+]
