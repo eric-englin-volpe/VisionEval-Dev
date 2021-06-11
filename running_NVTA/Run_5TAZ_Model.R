@@ -1,6 +1,4 @@
-# Run the NVTA model of VERSPM using the working draft inputs
-library(tidyverse)
-# if this returns a 'package not found' message, run install.packages('tidyverse', depends = T)
+# Run the 5TAZ hypothetical model of VERSPM 
 
 # Launch from the local version of an installed VisionEval,
 # by double-clicking VisionEval.Rproj then open this file.
@@ -12,25 +10,28 @@ rs <- openModel('VERSPM')
 # rs$run() 
 
 
-# VERSPM_NVTA ----
+# VERSPM_5TAZ ----
 
-if(!dir.exists('models/VERSPM_NVTA')){
-  vdot <- rs$copy('VERSPM_NVTA')
+if(!dir.exists('models/VERSPM_5TAZ')){
+  vdot <- rs$copy('VERSPM_5TAZ')
   # Change the inputs and defs folders to match what is in the Google Drive
 }
 
 # Open the model. 
-vdot <- openModel('VERSPM_NVTA')
+vdot <- openModel('VERSPM_5TAZ')
 
 # Check to make we have a version with the defs and inputs in place
-if(vdot$runParams$Region != 'NVTA'){
+if(vdot$runParams$Region != 'HYPO'){
   stop('Please get the defs and inputs file from the Google Drive and replace the defs and inputs in this model directory')
 }
+
 
 
 # Run the model!
 # If you have already run it, skip to extract steps
 vdot$run()
+
+
 
 # Extract all to csv. This is slow but extracts everything
 vdot$extract()
@@ -47,13 +48,19 @@ vdot$fields <- c('HhId', 'Azone', 'HhSize',
                  'AveVehTripLen')
 
 
+
+vdot$tables <- c('Marea')
+
+# Extract Dvmt, trip metrics, and DailyCO2e at household level, with additional variables 
+vdot$fields <- c('NonUrbanAveSpeed', 'LdvAveSpeed')
+
+# TODO: double check the units on LdvAveSpeed	from Marea. Currently outputting as MI/DAY instead of MI/HR as stated it should be in module docs.
+
 # See everything you've selected, with the units
 vdot$list(index=TRUE)
 
 # Create a results data frame
 results <- vdot$extract(saveTo = FALSE)
-
-
 
 # Clear the selections to make other selections
 vdot$tables = ''
@@ -69,6 +76,7 @@ hh_2045$Year = 2045
 d <- rbind(hh_2019, hh_2045)
 
 # Example visual. Summarize the distribution of Dvmt by county in the two years
+library(tidyverse)
 
 ggplot(d, aes(x = Dvmt, fill = as.factor(Year))) +
   geom_histogram(binwidth = 5) +
@@ -162,4 +170,5 @@ ggplot(d2, aes(x = sum_DVMT / sum_Pop, y = sum_DailyCO2e / sum_Pop, color = as.f
 ggsave('DVMT_CO2_per_capita.jpeg', width = 7, height = 5)
 
 # TODO: consider walk, transit, bike trips vs vehicle trips
+# Consider 
 

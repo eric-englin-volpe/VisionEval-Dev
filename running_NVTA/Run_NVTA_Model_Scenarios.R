@@ -13,7 +13,7 @@ rs <- openModel('VERSPM_Scenarios')
 
 # 1. VERSPM_VDOT ----
 
-if(!dir.exists('VERSPM_NVTA_Scenarios')){
+if(!dir.exists('models/VERSPM_NVTA_Scenarios')){
   vdot <- rs$copy('VERSPM_NVTA_Scenarios')
   # Change the inputs and defs folders to match what is in the Google Drive
 }
@@ -24,6 +24,9 @@ vdot <- openModel('VERSPM_NVTA_Scenarios')
 if(vdot$runParams$Region != 'NVTA'){
   stop('Please get the defs and inputs file from the Google Drive and replace the defs and inputs in this model directory')
 }
+
+# return 
+
 
 # Run the model!
 vdot$run()
