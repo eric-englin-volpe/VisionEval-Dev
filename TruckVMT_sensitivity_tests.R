@@ -5,7 +5,7 @@
 # Run default model VERSPM ----
 
 rs <- openModel('VERSPM')
-rs$run()
+# rs$run()
 
 # Extract VMT, income, population, and emissions outputs
 

@@ -10,7 +10,12 @@ library(tools)
 files <- list.dirs("models/scenario_inputs",full.names = FALSE,
                    recursive = FALSE)
 
-#iterate through the A-P scenarios
+
+
+# iterate through the A-P scenarios
+# Create a dataframe of scenario names
+modelNames <- vector()
+
 for (item in files){
   cat('Preparing Scenario', item, '\n\n')
   name <- paste0("models/scenario_inputs/",item)
@@ -45,16 +50,23 @@ for (item in files){
       to <- file.path(ve.runtime, 'models', modelName, "inputs", f)
       print(to)
       
-      # verify the to and from files are different
-      stopifnot(md5sum(from) != md5sum(to))
-      file.copy(from, to, overwrite = TRUE)
+      # Check to see if the 'to' exists; some inputs are optional
+      if(file.exists(to)){
+        # verify the to and from files are different
+        stopifnot(md5sum(from) != md5sum(to))
+      }
+      
+      # Save to 'msg' to suppress the printing of the result ('TRUE')
+      msg <- file.copy(from, to, overwrite = TRUE)
     }
   
-
-    # open and run the model
-    # runningModel <- openModel(modelName)
-    # runningModel$run()
+    
+  modelNames <- rbind(modelNames, data.frame(name = modelName,
+                                             files = paste(toChange, collapse = ", "),
+                                             location = runningModel$modelPath,
+                                             status = runningModel$status))
   }
 
+write.csv(modelNames, file.path(ve.runtime, 'models', 'Scenario_Status.csv'), row.names = F)
 }
 
