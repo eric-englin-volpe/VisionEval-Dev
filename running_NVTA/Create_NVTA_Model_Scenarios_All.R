@@ -4,6 +4,7 @@ library(tools)
 #Set Up Info --
 #scenario_inputs was downloaded from the VDOT Google drive and placed
 # in the /models directory of Vision Eval
+#updated run_parameters.json placed in /scenario_inputs directory
 #script expects VERSPM_NVTA Model already created
 
 #get the list of A-P scenarios
@@ -40,6 +41,13 @@ for (item in files){
     if(!dir.exists(file.path(ve.runtime, "models", modelName))){
       runningModel <- base$copy(modelName)
     }
+    
+    #copy in modified 'run_parameters.json' for single year
+    origin <- file.path(ve.runtime,"models","scenario_inputs","run_parameters.json")
+    dest <- file.path(ve.runtime,"models",modelName,"defs","run_parameters.json")
+    
+    param <- file.copy(origin, dest, overwrite = TRUE)
+    
     
     # prepare to copy over user changed input files
     # Use ve.runtime to locate where VisionEval is installed
