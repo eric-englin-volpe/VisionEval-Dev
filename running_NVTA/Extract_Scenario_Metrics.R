@@ -1,15 +1,5 @@
-# Extract model outputs from NVTA scnearios
+# Extract model outputs from NVTA scenarios
 
-library(tidyverse)
-
-
-# vdot <- openModel('VERSPM_NVTA')
-# vdot$run()
-
-# Extract all to csv. This is slow but extracts everything
-# vdot$extract()
-
-# For Scenarios ----
 # Marea:
 # - Total household DVMT 
 # - Heavy truck DVMT
@@ -96,10 +86,19 @@ extract_scenario_metrics <- function(modelName, Year = '2045'){
 
 
 # Usage ----
-results <- extract_scenario_metrics('VERSPM_NVTA')
+RUN_EXAMPLE = F
 
-results[[1]] # Marea
+if(RUN_EXAMPLE){
+  results_2045 <- extract_scenario_metrics('VERSPM_NVTA')
+  
+  results_2045[[1]] # Marea
+  
+  head(results_2045[[2]]) # Household
+  # In both, we save the model name because then we can rbind dataframes together across multiple models.
+  
+  results_base <- extract_scenario_metrics('VERSPM_NVTA', Year = 2019)
 
-head(results[[2]]) # Household
-# In both, we save the model name because then we can rbind dataframes together across multiple models.
-
+  View(marea_compare <- rbind(data.frame(Year = 2019, results_base[[1]]),
+                              data.frame(Year = 2045, results_2045[[1]])))
+    
+}  
