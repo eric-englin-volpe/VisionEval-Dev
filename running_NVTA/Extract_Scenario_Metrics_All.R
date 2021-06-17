@@ -1,3 +1,4 @@
+
 #Extract metrics from all run models in ScenarioStatus.csv and save the results
 
 extract_scenario_metrics <- function(modelName, Year = '2045'){
@@ -81,19 +82,22 @@ hh_compiled <- vector()
 # go through models in csv and run them each
 for(i in 1:nrow(data)){
   name <- data[i,"name"]
-  cat("Extracting statistics from", name)
+  cat("Extracting statistics from", name, '\n')
   results_2045 <- extract_scenario_metrics(name)
   
-  marea <- results_2045[[1]] #Marea
-  hh <- head(results_2045[[2]]) #Household
+  marea <- results_2045[[1]] # Marea
+  hh    <- results_2045[[2]] # Household
   
-  marea_compiled <- rbind(marea_compiled, data.frame(Year = "2045",marea))
-  hh_compiled <- rbind(hh_compiled, data.frame(Year = "2045",hh))
+  marea_compiled <- rbind(marea_compiled, marea)
+  hh_compiled <- rbind(hh_compiled, hh)
   
 }
 
 
-write.csv(marea_compiled, file.path(ve.runtime, 'models', 'MAREA stats.csv'))
-write.csv(hh_compiled,  file.path(ve.runtime, 'models', 'HH stats.csv'))
+write.csv(marea_compiled, file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'),
+          row.names = F)
+write.csv(hh_compiled,  file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv'),
+          row.names = F)
+
 View(marea_compiled)
 View(hh_compiled)
