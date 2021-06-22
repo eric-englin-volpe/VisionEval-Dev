@@ -1,5 +1,5 @@
-
-#Extract metrics from all run models in ScenarioStatus.csv and save the results
+# Extract metrics from all run models in ScenarioStatus.csv and save the results
+library(dplyr)
 
 extract_scenario_metrics <- function(modelName, Year = '2045'){
   # Will return an error if the model doesn't exist yet
@@ -71,8 +71,8 @@ extract_scenario_metrics <- function(modelName, Year = '2045'){
 
 #### Looping through the run scenarios to extract the information
 
-#read in csv 
-csvpath <- file.path(ve.runtime,"models","Scenario_Status.csv")
+# read in csv 
+csvpath <- file.path(ve.runtime,"models", "Scenario_Status.csv")
 data <- read.csv(csvpath)
 
 marea_compiled <- vector()
@@ -93,7 +93,6 @@ for(i in 1:nrow(data)){
   
 }
 
-
 write.csv(marea_compiled, file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'),
           row.names = F)
 write.csv(hh_compiled,  file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv'),
@@ -101,3 +100,40 @@ write.csv(hh_compiled,  file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv
 
 View(marea_compiled)
 View(hh_compiled)
+
+
+# Get units ----
+
+# DatastoreListing
+# This listing is maintained internally and contains the definitive list of what is in the
+# Datastore.
+# Use the first model for getting units
+use_model_path = data[1, 'location']
+
+dfls <- get(load(file.path(use_model_path, "Datastore", "DatastoreListing.Rda")))
+
+# DatastoreListing attributes
+attr.names <- unique(unlist(sapply(dfls$attributes, names)))
+
+attr2df <- function(atts) {
+  td <- lapply(atts,function(x)lapply(x, paste, collapse=" | ")) # make attributes into strings (some are vectors)
+  df <- data.frame(sapply(attr.names, function(x) character(0)))          # empty data.frame to hold results
+  el <- lapply(attr.names, function(x) "")                                # create list of empty strings
+  names(el) <- attr.names                                               # name the list after attr.names
+  df.rows <- lapply(td, function(x) { nw <- el; nw[names(x)] <- x; nw })
+  atts <- data.frame(bind_rows(df.rows))
+  atts <- atts[which(atts$NAME != "" & atts$TABLE != "" & atts$GROUP != ""),]  # Keep only the datasets
+  return(atts)
+}
+
+atts <- attr2df(dfls$attributes)
+
+# Subset to the metrics we use
+
+metric_units <- atts %>%
+  filter(NAME %in% c(names(hh_compiled), names(marea_compiled))) %>%
+  filter(TABLE %in% c('Marea', 'Household')) %>%
+  select(MODULE, NAME, TABLE, TYPE, UNITS, DESCRIPTION)
+
+write.csv(metric_units, file.path(ve.runtime, "models", "Extracted_Metric_Units.csv"),
+          row.names = F)
