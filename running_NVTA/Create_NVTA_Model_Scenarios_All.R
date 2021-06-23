@@ -43,10 +43,10 @@ for (item in files){
     }
     
     #copy in modified 'run_parameters.json' for single year
-    origin <- file.path(ve.runtime,"models","scenario_inputs","run_parameters.json")
-    dest <- file.path(ve.runtime,"models",modelName,"defs","run_parameters.json")
+    #origin <- file.path(ve.runtime,"models","scenario_inputs","run_parameters.json")
+    #dest <- file.path(ve.runtime,"models",modelName,"defs","run_parameters.json")
     
-    param <- file.copy(origin, dest, overwrite = TRUE)
+    #param <- file.copy(origin, dest, overwrite = TRUE)
     
     
     # prepare to copy over user changed input files
