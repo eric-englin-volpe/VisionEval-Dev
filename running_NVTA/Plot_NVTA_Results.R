@@ -4,6 +4,14 @@ library(tidyverse)
 #relies on scenario file with base included, as of now plots gave error regarding file
 # path when put into an RMarkdown file
 
+ve.runtime <- ifelse(grepl('Flynn', normalizePath('~/')), 
+                     file.path(dirname('~/'), 'Desktop/VE_4-1-0/'),
+                     ifelse(grepl('Lohmar', normalizePath('~/')), 
+                            file.path(dirname('~/'), '<PATH_TO_SARAH_VISIONEVAL>'),
+                            ifelse(grepl('englin', normalizePath('~/')), 
+                                   file.path('C:/Users/eric.englin/Desktop/VisionEval/4_04_v3/'),
+                                   NA)))
+
 # Currently working on Percent Differences for Average Household statistics
 
 readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))

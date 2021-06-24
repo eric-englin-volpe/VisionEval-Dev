@@ -1,7 +1,7 @@
 ---
 title: "NVTA_Results"
-author: "Sarah Lohmar"
-date: "6/22/2021"
+author: "Volpe Center (Sarah Lohmar, Dan Flynn, Eric Englin)"
+date: "6/24/2021"
 output:
   html_document:
     df_print: paged
@@ -20,8 +20,8 @@ ve.runtime <- ifelse(grepl('Flynn', normalizePath('~/')),
                      file.path(dirname('~/'), 'Desktop/VE_4-1-0/'),
                        ifelse(grepl('Lohmar', normalizePath('~/')), 
                        file.path(dirname('~/'), '<PATH_TO_SARAH_VISIONEVAL>'),
-                         ifelse(grepl('Englin', normalizePath('~/')), 
-                         file.path(dirname('~/'), '<PATH_TO_ERIC_VISIONEVAL>'),
+                         ifelse(grepl('englin', normalizePath('~/')), 
+                         file.path('C:/Users/eric.englin/Desktop/VisionEval/4_04_v3/'),
                           NA)))
 
 knitr::opts_knit$set(root.dir = ve.runtime)
