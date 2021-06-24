@@ -112,3 +112,12 @@ ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color)) +
   labs(title = "Percent Change VisionEval DVMT and MWCOG MOES Base Model for 2045", x = "Model Name", y = "Percent Change")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+
+
+Here is a table showing some of the validation steps taken:
+
+| File from the Travel Demand Model | Value       | Output from NOVA model | Output from VisionEval (Base Model) | Percent Difference |
+| --------------------------------- | ----------  | ---------------------- | ----------------------------------  | ------------------ |
+| 2019i4_Trip_Generation_Summary.txt | HH DVMT    | 34,049,034             | 30,040,347                          | 5-15%              |
+| 2019i4_Trip_Generation_Summary.txt | Truck DVMT | 5,690,723              | 1,206,452                           | 70-80%              |
+
