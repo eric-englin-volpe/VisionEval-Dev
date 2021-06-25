@@ -1,4 +1,4 @@
-library(ggplot2)
+library(plotly)
 library(tidyverse)
 
 #relies on scenario file with base included, as of now plots gave error regarding file
@@ -7,41 +7,55 @@ library(tidyverse)
 ve.runtime <- ifelse(grepl('Flynn', normalizePath('~/')), 
                      file.path(dirname('~/'), 'Desktop/VE_4-1-0/'),
                      ifelse(grepl('Lohmar', normalizePath('~/')), 
-                            file.path(dirname('~/'), '<PATH_TO_SARAH_VISIONEVAL>'),
+                            'C:/VisionEval',
                             ifelse(grepl('englin', normalizePath('~/')), 
-                                   file.path('C:/Users/eric.englin/Desktop/VisionEval/4_04_v3/'),
+                                   'C:/Users/eric.englin/Desktop/VisionEval/4_04_v3/',
                                    NA)))
 
 # Currently working on Percent Differences for Average Household statistics
 
-readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
+readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea_with_Base.csv'))
 
 #info for regional dvmt graphic 
-dvmt <- readfile[ ,c(1,2,3,4,5,6,7,8)]
-dvmt$regionalDVMT = rowSums(dvmt[,c(-1)])
-dvmtbase = dvmt[1,9]
-dvmt$modelName = substring(dvmt$modelName,8,15)
-dvmt[1,1] = "NVTA_Base"
-dvmt$regDVMTAbsDif = dvmt$regionalDVMT - dvmtbase
-dvmt$regDVMTPerChange = (dvmt$regDVMTAbsDif/dvmtbase)*100
-dvmt$color <- ifelse(dvmt$regDVMTPerChange > 0, "red","green")
+dvmt <- readfile %>%
+  select(modelName, contains('Dvmt')) %>%
+  rowwise() %>%
+  mutate(modelName = sub('VERSPM_', '', modelName)) %>%
+  mutate(regionalDVMT = sum(c_across(contains('Dvmt'))))
 
-dvmtplot1 <- data.frame(Model = dvmt$modelName,PercentChange = dvmt$regDVMTPerChange, 
-                        color = dvmt$color)
+dvmt$modelName[dvmt$modelName == 'NVTA'] = "Base"
 
-ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color)) + 
+dvmtbase = as.numeric(dvmt %>% filter(modelName == 'Base') %>% select(regionalDVMT))
+
+
+dvmt <- dvmt %>%
+  mutate(regDVMTAbsDif = regionalDVMT - dvmtbase,
+         regDVMTPerChange = (regDVMTAbsDif/dvmtbase)*100,
+         color = ifelse(regDVMTPerChange > 0, "pos","neg"),
+         pct_text = paste('Scenario:', modelName, '\n', round(regDVMTPerChange, 2), '%'),
+         mi_text = paste('Scenario:', modelName, '\n', format(round(regDVMTAbsDif, 2),
+                                                              scientific = F, 
+                                                              big.mark = ','), 'mi/day'))
+
+gp1 <- ggplot(dvmt, aes(x = modelName, y = regDVMTPerChange, fill = color,
+                        text = pct_text)) + 
   geom_bar(stat="identity") + theme_minimal() +
-  labs(title = "Percent Change Regional DVMT", x = "Model Name", y = "Percent Change")+
+  scale_fill_manual(values = c('lightgreen', 'tomato'),
+                    guide = F) +
+  labs(title = "Percent Change Regional DVMT", x = "Scenario", y = "Percent Change") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-dvmtplot2 <- data.frame(Model = dvmt$modelName,AbsoluteChange = dvmt$regDVMTAbsDif, 
-                        color = dvmt$color)
-
-ggplot(dvmtplot2, aes(x=Model, y=AbsoluteChange, fill = color)) + 
+gp2 <- ggplot(dvmt, aes(x = modelName, y = regDVMTAbsDif, fill = color,
+                        text = mi_text)) + 
   geom_bar(stat="identity") + theme_minimal() +
-  labs(title = "Absolute Change Regional DVMT", x = "Model Name", y = "Absolute Change")+
+  scale_fill_manual(values = c('lightgreen', 'tomato'),
+                    guide = F) +
+  labs(title = "Absolute Change Regional DVMT (mi/day)", x = "Scenario", y = "Absolute Change")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplotly(gp1, tooltip = 'text')
+
+ggplotly(gp2, tooltip = 'text')
 
 #info for commercial heavy truck gge
 gge <- readfile[ , c(1,11,12,13)]
