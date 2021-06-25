@@ -13,7 +13,7 @@ output:
       smooth_scroll: yes
 ---
 
-## Intial Findings 
+## Initial Findings 
 
 The Volpe team started by looking at the daily VMT for all scenarios. This is done by combining seven DVMT outputs by location and type of mode. 
 
@@ -22,8 +22,8 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ve.runtime <- ifelse(grepl('Flynn', normalizePath('~/')), 
                      file.path(dirname('~/'), 'Desktop/VE_4-1-0/'),
-                       ifelse(grepl('Lohmar', normalizePath('~/')), 
-                       file.path(dirname('~/'), '<PATH_TO_SARAH_VISIONEVAL>'),
+                      ifelse(grepl('lohmar', normalizePath('~/')), 
+                       'C:/VisionEval',
                          ifelse(grepl('englin', normalizePath('~/')), 
                          file.path('C:/Users/eric.englin/Desktop/VisionEval/4_04_v3/'),
                           NA)))
@@ -31,14 +31,15 @@ ve.runtime <- ifelse(grepl('Flynn', normalizePath('~/')),
 knitr::opts_knit$set(root.dir = ve.runtime)
 
 library(tidyverse)
+library(plotly) #install.packages('plotly')
 
 ```
 
 
 ```{r dvmt_plot}
-readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
+readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea_with_Base.csv'))
 
-#info for regional dvmt graphic 
+#info for regional dvmt graphic (summing cols b-h)
 dvmt <- readfile[ ,c(1,2,3,4,5,6,7,8)]
 dvmt$regionalDVMT = rowSums(dvmt[,c(-1)])
 dvmtbase = dvmt[1,9]
@@ -51,11 +52,107 @@ dvmt$color <- ifelse(dvmt$regDVMTPerChange > 0, "red","green")
 dvmtplot1 <- data.frame(Model = dvmt$modelName,PercentChange = dvmt$regDVMTPerChange, 
                         color = dvmt$color)
 
-ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color)) + 
+gp1 <- ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color)) +
   geom_bar(stat="identity") + theme_minimal() +
+  scale_fill_manual(values = c('tomato', 'lightgreen'),
+                    guide = F) +
   labs(title = "Percent Change Regional DVMT", x = "Model Name", y = "Percent Change")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplotly(gp1)
+
+dvmtplot2 <- data.frame(Model = dvmt$modelName,AbsoluteChange = dvmt$regDVMTAbsDif, 
+                        color = dvmt$color)
+
+gp2 <- ggplot(dvmtplot2, aes(x=Model, y=AbsoluteChange, fill = color)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  scale_fill_manual(values = c('tomato', 'lightgreen'), guide = F) +
+  labs(title = "Absolute Change Regional DVMT", x = "Model Name", y = "Absolute Change")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggplotly(gp2)
+
+
+#info for commercial heavy truck gge (sum columns k-m)
+gge <- readfile[ , c(1,11,12,13)]
+gge$modelName = substring(gge$modelName,8,15)
+gge[1,1] = "NVTA_Base"
+gge$ComHvyTruckGGE = rowSums(gge[,c(-1)])
+ggebase = gge[1,5]
+gge$ComHvyTruckGGEAbsDif = gge$ComHvyTruckGGE - ggebase
+gge$ComHvyTruckGGEPerChange = (gge$ComHvyTruckGGEAbsDif/ggebase) *100
+gge$color <- ifelse(gge$ComHvyTruckGGEPerChange > 0, "red","green")
+
+
+
+ggeplot1 <- data.frame(Model = gge$modelName,PercentChange = gge$ComHvyTruckGGEPerChange,
+                       color = gge$color)
+
+gp3 <- ggplot(ggeplot1, aes(x=Model, y=PercentChange, fill=color)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  scale_fill_manual(values = c('tomato', 'lightgreen'),
+                    guide = F) +
+  labs(title = "Percent Change Com Hvy Truck GGE", x = "Model Name", y ="Percent Change")+
+  theme(axis.text.x = element_text(angle = 45))
+
+ggplotly(gp3)
+
+
+
+# Household Data Visualization
+hhfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh_with_Base.csv'))
+baseNVTA <- hhfile[hhfile$modelName=="VERSPM_NVTA",]
+
+
+
+csvpath <- file.path(ve.runtime,"models","Scenario_Status.csv")
+data <- read.csv(csvpath)
+
+hh_sum_stat <- data.frame()
+
+for(i in 1:nrow(data)){
+  name <- data[i, "name"]
+  
+  stats <- c(name,sum(hhfile$DailyGGE[hhfile$modelName==name]),
+  sum(hhfile$DailyKWH[hhfile$modelName==name]),
+  sum(hhfile$DailyCO2e[hhfile$modelName==name]))
+  
+  hh_sum_stat <- rbind(hh_sum_stat,stats)
+  
+}
+colnames(hh_sum_stat) <- c("ModelName", "RegHhDailyGGE", 
+                            "RegHhDailyKWH",
+                            "RegHhDailyCO2e")
+rownames(hh_sum_stat) <- NULL
+
+baseGGE = as.numeric(hh_sum_stat[1,2])
+baseKWH = as.numeric(hh_sum_stat[1,3])
+baseCO2 = as.numeric(hh_sum_stat[1,4])
+
+hh_sum_stat$ModelName = substring(hh_sum_stat$ModelName,8,15)
+hh_sum_stat[1,1] = "NVTA_Base"
+
+hh_sum_stat$GGEPerChange = ((as.numeric(hh_sum_stat$RegHhDailyGGE) - baseGGE)/baseGGE)*100
+hh_sum_stat$KWHPerChange = ((as.numeric(hh_sum_stat$RegHhDailyKWH) - baseKWH)/baseKWH)*100
+hh_sum_stat$CO2PerChange = ((as.numeric(hh_sum_stat$RegHhDailyCO2e) - baseCO2)/baseCO2)*100
+
+hhgge <- data.frame(Model = hh_sum_stat$ModelName,GGE = hh_sum_stat$RegHhDailyGGE)
+hhkwh <- data.frame(Model = hh_sum_stat$ModelName,KWH = hh_sum_stat$RegHhDailyKWH)
+hhco2 <-data.frame(Model = hh_sum_stat$ModelName,CO2 = hh_sum_stat$RegHhDailyCO2e)
+
+ggplot(hhgge, aes(x=Model, y=GGE)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Regional GGE", x = "Model Name", y ="GGE/Day")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(hhkwh, aes(x=Model, y=KWH)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Regional KWH", x = "Model Name", y ="GGE/Day")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(hhco2, aes(x=Model, y=CO2)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Regional KWH", x = "Model Name", y ="KG/Day")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ## Validation 
