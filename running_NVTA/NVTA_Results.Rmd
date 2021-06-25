@@ -13,6 +13,11 @@ output:
       smooth_scroll: yes
 ---
 
+
+<!-- Add the following line manually to the rendered HTML document so that IE does not block the javascript elements: -->
+<!-- saved from url=(0014)about:internet --> 
+
+
 # Metropolitan Data Visualization 
 
 The Volpe team started by looking at the daily VMT for all scenarios. This is done by combining seven DVMT outputs by location and type of mode. Percent change is calculated relative to the base scenario value.
@@ -39,27 +44,45 @@ knitr::opts_knit$set(root.dir = ve.runtime)
 library(tidyverse)
 library(plotly) #install.packages('plotly')
 
+# Read in scenario descriptions
+
+scenario_desc <- readxl::read_excel(file.path(ve.runtime,
+                                              'models',
+                                              'Scenarios_Overview.xlsx'))
+
+# clean up trailing whitespace
+scenario_values <- scenario_desc %>%
+  mutate(`Model Run Name` = gsub('\\s+', '', `Model Run Name`))
+
 ```
+
+
 
 
 ## DVMT Plots
 
 ### Percent change 
 
+Across the study area, the largest DVMT changes in 2045 were observed for scenario K2 - Increasing Telecommuting, using the 'relative employment' input file in VisionEval to represent telecommuting. Interestingly, increases in DVMT were observed for the 'smaller familes' scenario. Increases in DVMT were observed for the higher population growth scenario, which is as expected. 
+
 ```{r dvmt_rel}
+
 readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea_with_Base.csv'))
+
+# Join in the scenario names
+readfile <- readfile %>%
+  mutate(modelName_join = gsub('\\d', '', modelName),
+         model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
+  left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
 
 #info for regional dvmt graphic 
 dvmt <- readfile %>%
   select(modelName, contains('Dvmt')) %>%
   rowwise() %>%
-  mutate(modelName = sub('VERSPM_', '', modelName)) %>%
   mutate(regionalDVMT = sum(c_across(contains('Dvmt'))))
 
-dvmt$modelName[dvmt$modelName == 'NVTA'] = "Base"
-
-dvmtbase = as.numeric(dvmt %>% filter(modelName == 'Base') %>% select(regionalDVMT))
-
+dvmtbase = as.numeric(dvmt %>% filter(modelName == '0 - Base') %>% select(regionalDVMT))
 
 dvmt <- dvmt %>%
   mutate(regDVMTAbsDif = regionalDVMT - dvmtbase,
@@ -103,7 +126,9 @@ ggplotly(gp2, tooltip = 'text')
 
 ## Energy Usage plots
 
-### Truck energy usage relative
+### Truck energy usage relative change
+
+As with the DVMT values, just looking at energy usage for heavy trucks, the largest decrease was for scenario K2 - Increasing Telecommuting. This is worth noting because we would not necessarily expect heavy truck trips to be altered so much by telecommuting, so this deserves more investigation. Increases in heavy truck energy use were observed for the 'L3 - Smaller Families' scenario, which is not necessarily expected.  
 
 ```{r truck_energy_rel}
 
@@ -114,12 +139,9 @@ gge <- readfile %>%
   select(modelName, matches('^(ComSvc|HvyTrk)')) %>%
   select(modelName, matches('GGE$')) %>%
   rowwise() %>%
-  mutate(modelName = sub('VERSPM_', '', modelName)) %>%
   mutate(ComHvyTruckGGE = sum(c_across(contains('GGE'))))
 
-gge$modelName[gge$modelName == 'NVTA'] = "Base"
-
-ggebase = as.numeric(gge %>% filter(modelName == 'Base') %>% select(ComHvyTruckGGE))
+ggebase = as.numeric(gge %>% filter(modelName == '0 - Base') %>% select(ComHvyTruckGGE))
 
 gge <- gge %>%
   mutate(ComHvyTruckGGEAbsDif = ComHvyTruckGGE - ggebase,
@@ -148,24 +170,30 @@ ggplotly(gp3, tooltip = 'text')
 
 # Household Data Visualization
 
-```{r household_prep, cache = T}
+In addition to examining the outputs which are reported at the entire metropolitan area level, we also investigated the outputs rolled up across all households. 
+
+## Energy consumption - gasoline equivalents
+
+```{r household_prep, cache = F}
 # Use `cache = T` for faster loading
 hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh_with_Base.csv'))
 
-baseNVTA <- hhfile %>%
-  filter(modelName == "VERSPM_NVTA") 
+# Join in the scenario names
+hhfile <- hhfile %>%
+  mutate(modelName_join = gsub('\\d', '', modelName),
+         model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
+  left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
 
 scenario_values <- hhfile %>%
-  filter(modelName != 'VERSPM_NVTA') %>% # exclude the base scenario
-  mutate(modelName = sub('VERSPM_', '', modelName)) %>%
+  filter(modelName != '0 - Base') %>% # exclude the base scenario
   group_by(modelName) %>%
   summarize(sum_Hh_GGE = sum(DailyGGE),
               sum_Hh_kWh = sum(DailyKWH),
               sum_Hh_CO2e = sum(DailyCO2e))
   
 base_values <- hhfile %>%
-  filter(modelName == "VERSPM_NVTA") %>%
-  mutate(modelName = 'NVTA_Base') %>%
+  filter(modelName == "0 - Base") %>%
   summarize(base_Hh_GGE = sum(DailyGGE),
             base_Hh_kWh = sum(DailyKWH),
             base_Hh_CO2e = sum(DailyCO2e))
@@ -202,9 +230,11 @@ gp4 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_GGE,
 ggsave(file.path(fig_save, 'Regional_GGE_Total.jpeg'))
 
 ggplotly(gp4, tooltip = 'text')
+```
 
+```{r householde_ggepct}
 gp5 <- ggplot(scenario_values, aes(x = modelName, y = GGEPerChange,
-                                   text = gge_text, fill = gge_color)) + 
+                                   text = gge_pct_text, fill = gge_color)) + 
   geom_bar(stat="identity") + theme_minimal() +
      scale_fill_manual(values = c('midnightblue', 'tomato'),
                     guide = F) +
@@ -216,7 +246,7 @@ ggsave(file.path(fig_save, 'Regional_GGE_Percent_Change.jpeg'))
 ggplotly(gp5, tooltip = 'text')
 
 ```
-### Electricity usage
+### Energy consumption - electricity 
 
 ```{r household_kwh}
 gp6 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_kWh,
@@ -229,9 +259,13 @@ ggsave(file.path(fig_save, 'Regional_kWh_Total.jpeg'))
 
 
 ggplotly(gp6, tooltip = 'text')
+```
 
+Again, scenario K2 - Increasing telecommuting had by far the biggest reduction in electricity use. 
+
+```{r household_kwh_pct}
 gp7 <- ggplot(scenario_values, aes(x = modelName, y = KWHPerChange,
-                            text = kwh_text, fill = kwh_color)) + 
+                            text = kwh_pct_text, fill = kwh_color)) + 
   geom_bar(stat="identity") + theme_minimal() +
      scale_fill_manual(values = c('midnightblue', 'tomato'),
                     guide = F) +
@@ -258,9 +292,13 @@ gp8 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_CO2e,
 ggsave(file.path(fig_save, 'Regional_CO2e_Total.jpeg'))
 
 ggplotly(gp8, tooltip = 'text')
+```
 
+The largest changes in emissions, summed up from the household CO[2]e values, was under the scenario with increasing electrification (2 different levels of increase tested), with the very substantial reductions as well observed under the K2 - increasing telecommuting scenario. 
+
+```{r household_emissions_pct}
 gp9 <- ggplot(scenario_values, aes(x = modelName, y = CO2PerChange,
-                            text = co2_text, fill = co2_color)) + 
+                            text = co2_pct_text, fill = co2_color)) + 
   geom_bar(stat="identity") + theme_minimal() +
   labs(title = "Regional CO[2]e Percent Change", x = "Model Name", y ="g CO[2] equivalent / Day")+
      scale_fill_manual(values = c('midnightblue', 'tomato'),
@@ -319,15 +357,26 @@ MWCOG_model_dvmt = ffx_county_car_2045+ffx_city_car_2045+fall_church_car_2045+ff
 
 dvmt$regDVMTAbsDif = dvmt$regionalDVMT - MWCOG_model_dvmt
 dvmt$regDVMTPerChange = (dvmt$regDVMTAbsDif/MWCOG_model_dvmt)*100
-dvmt$color <- ifelse(dvmt$regDVMTPerChange < 0, "red","green")
+dvmt$color <- ifelse(dvmt$regDVMTPerChange < 0, "neg","pos")
 
 dvmtplot1 <- data.frame(Model = dvmt$modelName,PercentChange = dvmt$regDVMTPerChange, 
-                        color = dvmt$color)
+                        color = dvmt$color,
+                        vmt_text = paste('Scenario:', dvmt$modelName, '\n', round(dvmt$regDVMTPerChange, 2), '%'))
 
-ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color)) + 
+
+gp_v <- ggplot(dvmtplot1, aes(x=Model, y=PercentChange, fill = color, text = vmt_text)) + 
   geom_bar(stat="identity") + theme_minimal() +
+     scale_fill_manual(values = c('midnightblue', 'tomato'),
+                    guide = F) +
   labs(title = "Percent Change VisionEval DVMT and MWCOG MOES Base Model for 2045", x = "Model Name", y = "Percent Change")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave(file.path(fig_save, 'VMT_Validation.jpeg'))
+
+ggplotly(gp_v, tooltip = 'text')
+
+
+
 ```
 
 
