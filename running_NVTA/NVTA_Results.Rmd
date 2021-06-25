@@ -15,7 +15,7 @@ output:
 
 # Metropolitan Data Visualization 
 
-The Volpe team started by looking at the daily VMT for all scenarios. This is done by combining seven DVMT outputs by location and type of mode. 
+The Volpe team started by looking at the daily VMT for all scenarios. This is done by combining seven DVMT outputs by location and type of mode. Percent change is calculated relative to the base scenario value.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = F, warning = F)
@@ -176,14 +176,17 @@ scenario_values <- scenario_values %>%
   mutate(GGEPerChange = ((sum_Hh_GGE - base_values$base_Hh_GGE) / base_values$base_Hh_GGE) * 100,
          KWHPerChange = ((sum_Hh_kWh - base_values$base_Hh_kWh) / base_values$base_Hh_kWh) * 100,
          CO2PerChange = ((sum_Hh_CO2e - base_values$base_Hh_CO2e) / base_values$base_Hh_CO2e) * 100,
+         gge_color= ifelse(GGEPerChange > 0, "pos","neg"),
          gge_pct_text = paste('Scenario:', modelName, '\n', round(GGEPerChange, 2), '%'),
          gge_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_GGE, 2),
                                                               scientific = F, 
                                                               big.mark = ','), 'Gasoline gallone equiv.'),
+         kwh_color= ifelse(KWHPerChange > 0, "pos","neg"),
          kwh_pct_text = paste('Scenario:', modelName, '\n', round(KWHPerChange, 2), '%'),
          kwh_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_kWh, 2),
                                                               scientific = F, 
                                                               big.mark = ','), 'kWh'),
+         co2_color= ifelse(CO2PerChange > 0, "pos","neg"),
          co2_pct_text = paste('Scenario:', modelName, '\n', round(CO2PerChange, 2), '%'),
          co2_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_CO2e, 2),
                                                               scientific = F, 
@@ -200,28 +203,52 @@ ggsave(file.path(fig_save, 'Regional_GGE_Total.jpeg'))
 
 ggplotly(gp4, tooltip = 'text')
 
-```
+gp5 <- ggplot(scenario_values, aes(x = modelName, y = GGEPerChange,
+                                   text = gge_text, fill = gge_color)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+     scale_fill_manual(values = c('midnightblue', 'tomato'),
+                    guide = F) +
+  labs(title = "Regional daily gasoline gallon equivalents % Change", x = "Scenario", y = "GGE/Day")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggsave(file.path(fig_save, 'Regional_GGE_Percent_Change.jpeg'))
+
+ggplotly(gp5, tooltip = 'text')
+
+```
 ### Electricity usage
 
 ```{r household_kwh}
-gp5 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_kWh,
+gp6 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_kWh,
                             text = kwh_text)) + 
   geom_bar(stat="identity") + theme_minimal() +
   labs(title = "Regional KWH", x = "Scenario", y = "kWh/Day")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-
-
 ggsave(file.path(fig_save, 'Regional_kWh_Total.jpeg'))
 
-ggplotly(gp5, tooltip = 'text')
+
+ggplotly(gp6, tooltip = 'text')
+
+gp7 <- ggplot(scenario_values, aes(x = modelName, y = KWHPerChange,
+                            text = kwh_text, fill = kwh_color)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+     scale_fill_manual(values = c('midnightblue', 'tomato'),
+                    guide = F) +
+  labs(title = "Regional KWH Percent Change", x = "Scenario", y = "kWh/Day")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+ggsave(file.path(fig_save, 'Regional_kWh_Percent_Change.jpeg'))
+
+ggplotly(gp7, tooltip = 'text')
 ```
 
 ### Emissions
 
 ```{r household_emissions}
-gp6 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_CO2e,
+gp8 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_CO2e,
                             text = co2_text)) + 
   geom_bar(stat="identity") + theme_minimal() +
   labs(title = "Regional CO[2]e", x = "Model Name", y ="g CO[2] equivalent / Day")+
@@ -230,7 +257,22 @@ gp6 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_CO2e,
 
 ggsave(file.path(fig_save, 'Regional_CO2e_Total.jpeg'))
 
-ggplotly(gp6, tooltip = 'text')
+ggplotly(gp8, tooltip = 'text')
+
+gp9 <- ggplot(scenario_values, aes(x = modelName, y = CO2PerChange,
+                            text = co2_text, fill = co2_color)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Regional CO[2]e Percent Change", x = "Model Name", y ="g CO[2] equivalent / Day")+
+     scale_fill_manual(values = c('midnightblue', 'tomato'),
+                    guide = F) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+ggsave(file.path(fig_save, 'Regional_CO2e_Percent_Change.jpeg'))
+
+ggplotly(gp9, tooltip = 'text')
+
+
 ```
 
 # Validation 
