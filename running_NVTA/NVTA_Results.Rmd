@@ -1,7 +1,6 @@
 ---
-title: "NVTA_Results"
-author: "Volpe Center (Sarah Lohmar, Dan Flynn, Eric Englin)"
-date: "6/24/2021"
+title: "NVTA VisionEval Scenario Results"
+date: "`r Sys.Date()`"
 output:
   html_document:
     df_print: paged
@@ -63,7 +62,7 @@ scenario_values <- scenario_desc %>%
 
 ### Percent change 
 
-Across the study area, the largest DVMT changes in 2045 were observed for scenario K2 - Increasing Telecommuting, using the 'relative employment' input file in VisionEval to represent telecommuting. Interestingly, increases in DVMT were observed for the 'smaller familes' scenario. Increases in DVMT were observed for the higher population growth scenario, which is as expected. 
+Across the study area, the largest DVMT changes in 2045 were observed for scenario K2 - Increasing Telecommuting, using the 'relative employment' input file in VisionEval to represent telecommuting. Interestingly, increases in DVMT were observed for the 'smaller families' scenario. Increases in DVMT were observed for the higher population growth scenario, which is as expected. 
 
 ```{r dvmt_rel}
 
@@ -339,6 +338,8 @@ City of Fairfax               0      37,640      12,957         774           0 
 Falls Church                  0      18,944       5,575         425           0           0      24,944
 
 
+
+
 When you add all of the numbers up, you get 34,049,034 daily VMTs. This is about 4,000,000 higher than the VisionEval dvmt values. The chart below shows the percent differences with each of our scenarios. 
 
 ```{r dvmt_plot_validation}
@@ -379,11 +380,32 @@ ggplotly(gp_v, tooltip = 'text')
 
 ```
 
+```{r valid_table}
 
-Here is a table showing some of the validation steps taken:
+library(DT)
 
-| File from the Travel Demand Model | Value       | Output from NOVA model | Output from VisionEval (Base Model) | Percent Difference |
-| --------------------------------- | ----------  | ---------------------- | ----------------------------------  | ------------------ |
-| 2019i4_Trip_Generation_Summary.txt | HH DVMT    | 34,049,034             | 30,040,347                          | 5-15%              |
-| 2019i4_Trip_Generation_Summary.txt | Truck DVMT | 5,690,723              | 1,206,452                           | 70-80%              |
+datatable(dvmt %>% select(-regDVMTAbsDif, -color, -pct_text, -mi_text) %>%
+            relocate(regionalDVMT, .after = modelName),
+           rownames = F,
+          filter = 'top',
+          extensions = c('Buttons'),
+          options = c(
+            pageLength = 10,
+            dom = 'BSfrtip',
+            colReorder = TRUE,
+            select = TRUE,
+            search = list(regex = TRUE), # add regex searching to all search boxes
+            buttons = list('copy', 'print',
+                           list(
+                             extend = 'collection',
+                             buttons = c('csv', 'excel', 'pdf'),
+                             text = 'Download')),
+            autoWidth = TRUE,
+            scrollX = TRUE, scrollY = 600),
+           caption = "VMT values from NVTA scenarios" ) %>%
+  formatRound(2:9, 0) %>%
+  formatStyle('regionalDVMT', 
+              backgroundColor = 'dodgerblue')
+
+```
 
