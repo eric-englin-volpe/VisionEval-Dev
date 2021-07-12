@@ -52,7 +52,14 @@ extract_scenario_metrics <- function(modelName, Year = '2045'){
   mod$fields <- ''
   
   mod$tables <- 'Household'
-  mod$fields <- c('DailyGGE',
+  mod$fields <- c('Bzone',
+                  'Income',
+                  'OwnCost',
+                  'WalkTrips',
+                  'VehicleTrips',
+                  'BikeTrips',
+                  'TransitTrips',
+                  'DailyGGE',
                   'DailyKWH',
                   'DailyCO2e')
   
@@ -72,17 +79,18 @@ extract_scenario_metrics <- function(modelName, Year = '2045'){
 #### Looping through the run scenarios to extract the information
 
 # read in csv 
-csvpath <- file.path(ve.runtime,"models", "Scenario_Status.csv")
-data <- read.csv(csvpath)
+csvpath <- file.path(ve.runtime, "models", "Scenario_Status.csv")
+models <- read.csv(csvpath)
 
 marea_compiled <- vector()
 hh_compiled <- vector()
 
 
 # go through models in csv and run them each
-for(i in 1:nrow(data)){
-  name <- data[i,"name"]
-  cat("Extracting statistics from", name, '\n')
+for(i in 1:nrow(models)){
+  # i = 1
+  name <- models[i,"name"]
+  cat("\n\n Extracting statistics from", name, '\n')
   results_2045 <- extract_scenario_metrics(name)
   
   marea <- results_2045[[1]] # Marea
@@ -108,7 +116,7 @@ View(hh_compiled)
 # This listing is maintained internally and contains the definitive list of what is in the
 # Datastore.
 # Use the first model for getting units
-use_model_path = data[1, 'location']
+use_model_path = models[1, 'location']
 
 dfls <- get(load(file.path(use_model_path, "Datastore", "DatastoreListing.Rda")))
 
@@ -137,3 +145,12 @@ metric_units <- atts %>%
 
 write.csv(metric_units, file.path(ve.runtime, "models", "Extracted_Metric_Units.csv"),
           row.names = F)
+
+# Save as RData
+
+save(file = 'models/VDOT_Scenarios_Complete.RData',
+     list = c('metric_units',
+              'hh_compiled',
+              'marea_compiled',
+              'models',
+              'atts'))

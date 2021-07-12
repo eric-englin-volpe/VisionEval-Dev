@@ -29,8 +29,8 @@ scenario_values <- scenario_desc %>%
 
 scenario_values <- scenario_values %>%
   mutate(ModelNameLabel = ifelse(scenario_values$Level == 'NA' |
-        str_detect(scenario_values$Folder,'C0\\d'),scenario_values$`Model Run Name`,
-        paste0(scenario_values$`Model Run Name`,scenario_values$Level)))
+        str_detect(scenario_values$Folder,'C0\\d'), scenario_values$`Model Run Name`,
+        paste0(scenario_values$`Model Run Name`, scenario_values$Level)))
 
 scenario_values <- scenario_values %>%
   mutate(`ModelNameLabel` = gsub('\\s+', '', `ModelNameLabel`))
@@ -41,32 +41,30 @@ scenario_values <- scenario_values %>%
 ### Percent change 
 
 
-readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea_with_Base.csv'))
-newrun <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
-
-
-readfile <- readfile %>% slice(-c(2, 3, 4,5))
-readfile <- rbind(readfile,newrun)
+marea_results <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
 
 #Join in the scenario names
-# readfile <- readfile %>%
+# marea_results <- marea_results %>%
 #   mutate(modelName_join = gsub('\\d{1,3}', '', modelName),
 #          model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
 #   left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
 #   mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
 # 
 
-readfile <- readfile %>% 
+marea_results <- marea_results %>% 
   mutate(`modelName` = gsub('\\s+', '', `modelName`)) %>% 
   mutate(model_run_no = str_extract(modelName, '[A-Z]\\d{1,3}$')) %>% 
   left_join(scenario_values, by = c("modelName" = "ModelNameLabel")) 
 
 
-readfile <- readfile %>%   
-  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, readfile$'Short Name', sep = ' - ')))
+marea_results <- marea_results %>%   
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', 
+                            '0 - Base',
+                            paste(model_run_no, `Short Name`, sep = ' - ')))
+
 #info for regional dvmt graphic
 
-dvmt <- readfile %>%
+dvmt <- marea_results %>%
   select(modelName, contains('Dvmt')) %>%
   rowwise() %>%
   mutate(regionalDVMT = sum(c_across(contains('Dvmt'))))
@@ -91,6 +89,7 @@ gp1 <- ggplot(dvmt, aes(x = modelName, y = regDVMTPerChange, fill = color,
   labs(title = "Percent Change Regional DVMT", x = "Scenario", y = "Percent Change") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+gp1
 # Save the output figure to disk for inclusion in a manuscript
 ggsave(file.path(fig_save, 'DVMT_Rel_Change.jpeg'))
 
@@ -120,7 +119,7 @@ ggplotly(gp2, tooltip = 'text')
 #info for commercial heavy truck gge (sum columns k-m)
 # use `matches()` to use regular expressions first to find variable names that start with 
 # ComSvc or HvyTrk, and then a second one to find only those which also have GGE at the end
-gge <- readfile %>%
+gge <- marea_results %>%
   select(modelName, matches('^(ComSvc|HvyTrk)')) %>%
   select(modelName, matches('GGE$')) %>%
   rowwise() %>%
@@ -159,13 +158,7 @@ ggplotly(gp3, tooltip = 'text')
 ## Energy consumption - gasoline equivalents
 
 # Use `cache = T` for faster loading
-hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh_with_Base.csv'))
-newhhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv'))
-
-hhfile<-subset(hhfile, modelName!="VERSPM_NVTA_A2" & modelName!="VERSPM_NVTA_B2" &
-                 modelName!="VERSPM_NVTA_C2" & modelName!="VERSPM_NVTA_D2")
-
-hhfile <- rbind(hhfile,newhhfile)
+hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv'))
 
 # Join in the scenario names
 hhfile <- hhfile %>%
@@ -175,20 +168,41 @@ hhfile <- hhfile %>%
   mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
 
 
+# Calculate mode split
+hhfile <- hhfile %>%
+  rowwise() %>%
+  mutate(total_trips = sum(WalkTrips, BikeTrips, TransitTrips, VehicleTrips),
+         pct_Walk = WalkTrips / total_trips,
+         pct_Bike = BikeTrips / total_trips,
+         pct_Transit = TransitTrips / total_trips,
+         pct_Vehicle = VehicleTrips / total_trips)
+
 scenario_values <- hhfile %>%
   filter(modelName != '0 - Base') %>% # exclude the base scenario
-  #filter(modelName != 'VERSPM_NVTA') %>%
   group_by(modelName) %>%
   summarize(sum_Hh_GGE = sum(DailyGGE),
             sum_Hh_kWh = sum(DailyKWH),
-            sum_Hh_CO2e = sum(DailyCO2e))
+            sum_Hh_CO2e = sum(DailyCO2e),
+            median_Income = median(Income),
+            median_OwnCost = median(OwnCost),
+            median_pct_Walk = median(pct_Walk),
+            median_pct_Bike = median(pct_Bike),
+            median_pct_Transit = median(pct_Transit),
+            median_pct_Vehicle = median(pct_Vehicle)
+            )
 
 base_values <- hhfile %>%
   filter(modelName == "0 - Base") %>%
-  #filter(modelName == "VERSPM_NVTA") %>%
   summarize(base_Hh_GGE = sum(DailyGGE),
             base_Hh_kWh = sum(DailyKWH),
-            base_Hh_CO2e = sum(DailyCO2e))
+            base_Hh_CO2e = sum(DailyCO2e),
+            median_Income = median(Income),
+            median_OwnCost = median(OwnCost),
+            median_pct_Walk = median(pct_Walk),
+            median_pct_Bike = median(pct_Bike),
+            median_pct_Transit = median(pct_Transit),
+            median_pct_Vehicle = median(pct_Vehicle)
+            )
 
 # We use base_values$... to compare the scenario values with the corresponding base values data frame
 

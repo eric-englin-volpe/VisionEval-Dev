@@ -12,7 +12,7 @@ rs <- openModel('VERSPM')
 
 # VERSPM_5TAZ ----
 
-if(!dir.exists('VERSPM_5TAZ')){
+if(!dir.exists('models/VERSPM_5TAZ')){
   vdot <- rs$copy('VERSPM_5TAZ')
   # Change the inputs and defs folders to match what is in the Google Drive
 }
@@ -31,7 +31,7 @@ if(vdot$runParams$Region != 'HYPO'){
 vdot$run()
 
 # Extract all to csv. This is slow but extracts everything
-vdot$extract()
+# vdot$extract()
 
 # Focused extraction ----
 # Start here after running openModel
