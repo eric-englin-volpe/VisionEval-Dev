@@ -576,4 +576,8 @@ save(file = 'Final_NVTA_results.RData',
               'scenario_values',
               'hhfile'))
 
+# to confirm the total CO2 values from household file:
+# co2compile <- hh_compiled %>% group_by(modelName) %>% summarize(sum_CO2 = sum(DailyCO2e))
+# View(co2compiled)
+
 ```
