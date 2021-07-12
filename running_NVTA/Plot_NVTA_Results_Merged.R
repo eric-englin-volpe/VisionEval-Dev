@@ -43,14 +43,6 @@ scenario_values <- scenario_values %>%
 
 marea_results <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
 
-#Join in the scenario names
-# marea_results <- marea_results %>%
-#   mutate(modelName_join = gsub('\\d{1,3}', '', modelName),
-#          model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
-#   left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
-#   mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
-# 
-
 marea_results <- marea_results %>% 
   mutate(`modelName` = gsub('\\s+', '', `modelName`)) %>% 
   mutate(model_run_no = str_extract(modelName, '[A-Z]\\d{1,3}$')) %>% 
@@ -162,10 +154,15 @@ hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.c
 
 # Join in the scenario names
 hhfile <- hhfile %>%
-  mutate(modelName_join = gsub('\\d', '', modelName),
-         model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
-  left_join(scenario_desc, by = c("modelName" = "Model Run Name")) %>%
-  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
+  mutate(`modelName` = gsub('\\s+', '', `modelName`)) %>% 
+  mutate(model_run_no = str_extract(modelName, '[A-Z]\\d{1,3}$')) %>% 
+  left_join(scenario_values, by = c("modelName" = "ModelNameLabel")) 
+
+hhfile <- hhfile %>%
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', 
+                            '0 - Base',
+                            paste(model_run_no, `Short Name`, sep = ' - ')))
+
 
 
 # Calculate mode split
@@ -184,7 +181,7 @@ scenario_values <- hhfile %>%
             sum_Hh_kWh = sum(DailyKWH),
             sum_Hh_CO2e = sum(DailyCO2e),
             median_Income = median(Income),
-            median_OwnCost = median(OwnCost),
+            median_OwnCost = median(OwnCost, na.rm = T),
             median_pct_Walk = median(pct_Walk),
             median_pct_Bike = median(pct_Bike),
             median_pct_Transit = median(pct_Transit),
@@ -193,11 +190,12 @@ scenario_values <- hhfile %>%
 
 base_values <- hhfile %>%
   filter(modelName == "0 - Base") %>%
+  group_by(modelName) %>%
   summarize(base_Hh_GGE = sum(DailyGGE),
             base_Hh_kWh = sum(DailyKWH),
             base_Hh_CO2e = sum(DailyCO2e),
             median_Income = median(Income),
-            median_OwnCost = median(OwnCost),
+            median_OwnCost = median(OwnCost, na.rm = T),
             median_pct_Walk = median(pct_Walk),
             median_pct_Bike = median(pct_Bike),
             median_pct_Transit = median(pct_Transit),

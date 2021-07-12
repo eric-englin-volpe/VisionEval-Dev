@@ -42,9 +42,9 @@ knitr::opts_knit$set(root.dir = ve.runtime)
 
 library(tidyverse)
 library(plotly) #install.packages('plotly')
+library(DT) # install.packages('DT')
 
 # Read in scenario descriptions
-
 scenario_desc <- readxl::read_excel(file.path(ve.runtime,
                                               'models',
                                               'Scenarios_Overview.xlsx'))
@@ -52,6 +52,14 @@ scenario_desc <- readxl::read_excel(file.path(ve.runtime,
 # clean up trailing whitespace
 scenario_values <- scenario_desc %>%
   mutate(`Model Run Name` = gsub('\\s+', '', `Model Run Name`))
+
+scenario_values <- scenario_values %>%
+  mutate(ModelNameLabel = ifelse(scenario_values$Level == 'NA' |
+        str_detect(scenario_values$Folder,'C0\\d'), scenario_values$`Model Run Name`,
+        paste0(scenario_values$`Model Run Name`, scenario_values$Level)))
+
+scenario_values <- scenario_values %>%
+  mutate(`ModelNameLabel` = gsub('\\s+', '', `ModelNameLabel`))
 
 ```
 
@@ -66,22 +74,28 @@ Across the study area, the largest DVMT changes in 2045 were observed for scenar
 
 ```{r dvmt_rel}
 
-readfile <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea_with_Base.csv'))
+marea_results <- read.csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Marea.csv'))
 
-# Join in the scenario names
-readfile <- readfile %>%
-  mutate(modelName_join = gsub('\\d', '', modelName),
-         model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
-  left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
-  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
+marea_results <- marea_results %>% 
+  mutate(`modelName` = gsub('\\s+', '', `modelName`)) %>% 
+  mutate(model_run_no = str_extract(modelName, '[A-Z]\\d{1,3}$')) %>% 
+  left_join(scenario_values, by = c("modelName" = "ModelNameLabel")) 
 
-#info for regional dvmt graphic 
-dvmt <- readfile %>%
+
+marea_results <- marea_results %>%   
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', 
+                            '0 - Base',
+                            paste(model_run_no, `Short Name`, sep = ' - ')))
+
+#info for regional dvmt graphic
+
+dvmt <- marea_results %>%
   select(modelName, contains('Dvmt')) %>%
   rowwise() %>%
   mutate(regionalDVMT = sum(c_across(contains('Dvmt'))))
 
 dvmtbase = as.numeric(dvmt %>% filter(modelName == '0 - Base') %>% select(regionalDVMT))
+#dvmtbase = as.numeric(dvmt %>% filter(modelName == 'VERSPM_NVTA') %>% select(regionalDVMT))
 
 dvmt <- dvmt %>%
   mutate(regDVMTAbsDif = regionalDVMT - dvmtbase,
@@ -99,6 +113,7 @@ gp1 <- ggplot(dvmt, aes(x = modelName, y = regDVMTPerChange, fill = color,
                     guide = F) +
   labs(title = "Percent Change Regional DVMT", x = "Scenario", y = "Percent Change") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
 # Save the output figure to disk for inclusion in a manuscript
 ggsave(file.path(fig_save, 'DVMT_Rel_Change.jpeg'))
@@ -134,13 +149,14 @@ As with the DVMT values, just looking at energy usage for heavy trucks, the larg
 #info for commercial heavy truck gge (sum columns k-m)
 # use `matches()` to use regular expressions first to find variable names that start with 
 # ComSvc or HvyTrk, and then a second one to find only those which also have GGE at the end
-gge <- readfile %>%
+gge <- marea_results %>%
   select(modelName, matches('^(ComSvc|HvyTrk)')) %>%
   select(modelName, matches('GGE$')) %>%
   rowwise() %>%
   mutate(ComHvyTruckGGE = sum(c_across(contains('GGE'))))
 
 ggebase = as.numeric(gge %>% filter(modelName == '0 - Base') %>% select(ComHvyTruckGGE))
+#ggebase = as.numeric(gge %>% filter(modelName == 'VERSPM_NVTA') %>% select(ComHvyTruckGGE))
 
 gge <- gge %>%
   mutate(ComHvyTruckGGEAbsDif = ComHvyTruckGGE - ggebase,
@@ -164,8 +180,39 @@ gp3 <- ggplot(gge, aes(x = modelName, y = ComHvyTruckGGEPerChange, fill = sign,
 ggsave(file.path(fig_save, 'Truck_GGE_Pct_Change.jpeg'))
 
 ggplotly(gp3, tooltip = 'text')
+
 ```
 
+## Metropolitan area data table
+
+
+```{r marea_table}
+marea_table <- marea_results %>% select(-names(marea_results)[names(marea_results) %in% names(scenario_values)])
+
+val_length <- sapply(marea_table, FUN = function(x) ifelse(is.numeric(x), max(nchar(as.character(round(x, 0)))),
+                                                           max(nchar(x))))
+
+
+
+datatable(marea_table,
+          rownames = F,
+          filter = 'top',
+          extensions = c('Buttons','ColReorder', 'Select'),
+ options = list(
+   pageLength = 10,
+   dom = 'BSfrtip',
+   colReorder = TRUE,
+   select = TRUE,
+   search = list(regex = TRUE), # add regex searching to all search boxes
+   buttons = c('csv', 'excel', 'colvis'),
+   autoWidth = TRUE,
+   scrollX = TRUE, scrollY = 600)
+  ,
+ caption = "Complete metropolitan area results for NVTA scenarios." ) %>%
+  formatRound(which(val_length >= 5 & !grepl('model', names(val_length))), 0) %>%
+  formatRound(which(val_length < 5 & !grepl('model', names(val_length))), 2) 
+
+```
 
 # Household Data Visualization
 
@@ -174,28 +221,57 @@ In addition to examining the outputs which are reported at the entire metropolit
 ## Energy consumption - gasoline equivalents
 
 ```{r household_prep, cache = F}
-# Use `cache = T` for faster loading
-hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh_with_Base.csv'))
+hhfile <- readr::read_csv(file.path(ve.runtime, 'models', 'Scenario_Metrics_Hh.csv'))
 
 # Join in the scenario names
 hhfile <- hhfile %>%
-  mutate(modelName_join = gsub('\\d', '', modelName),
-         model_run_no = str_extract(modelName, '[A-Z]\\d$')) %>%
-  left_join(scenario_desc, by = c("modelName_join" = "Model Run Name")) %>%
-  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', '0 - Base', paste(model_run_no, `Short Name`, sep = ' - ')))
+  mutate(`modelName` = gsub('\\s+', '', `modelName`)) %>% 
+  mutate(model_run_no = str_extract(modelName, '[A-Z]\\d{1,3}$')) %>% 
+  left_join(scenario_values, by = c("modelName" = "ModelNameLabel")) 
+
+hhfile <- hhfile %>%
+  mutate(modelName = ifelse(modelName == 'VERSPM_NVTA', 
+                            '0 - Base',
+                            paste(model_run_no, `Short Name`, sep = ' - ')))
+
+
+
+# Calculate mode split
+hhfile <- hhfile %>%
+  rowwise() %>%
+  mutate(total_trips = sum(WalkTrips, BikeTrips, TransitTrips, VehicleTrips),
+         pct_Walk = WalkTrips / total_trips,
+         pct_Bike = BikeTrips / total_trips,
+         pct_Transit = TransitTrips / total_trips,
+         pct_Vehicle = VehicleTrips / total_trips)
 
 scenario_values <- hhfile %>%
   filter(modelName != '0 - Base') %>% # exclude the base scenario
   group_by(modelName) %>%
   summarize(sum_Hh_GGE = sum(DailyGGE),
-              sum_Hh_kWh = sum(DailyKWH),
-              sum_Hh_CO2e = sum(DailyCO2e))
-  
+            sum_Hh_kWh = sum(DailyKWH),
+            sum_Hh_CO2e = sum(DailyCO2e),
+            median_Income = median(Income),
+            median_OwnCost = median(OwnCost, na.rm = T),
+            median_pct_Walk = median(pct_Walk),
+            median_pct_Bike = median(pct_Bike),
+            median_pct_Transit = median(pct_Transit),
+            median_pct_Vehicle = median(pct_Vehicle)
+            )
+
 base_values <- hhfile %>%
   filter(modelName == "0 - Base") %>%
+  group_by(modelName) %>%
   summarize(base_Hh_GGE = sum(DailyGGE),
             base_Hh_kWh = sum(DailyKWH),
-            base_Hh_CO2e = sum(DailyCO2e))
+            base_Hh_CO2e = sum(DailyCO2e),
+            median_Income = median(Income),
+            median_OwnCost = median(OwnCost, na.rm = T),
+            median_pct_Walk = median(pct_Walk),
+            median_pct_Bike = median(pct_Bike),
+            median_pct_Transit = median(pct_Transit),
+            median_pct_Vehicle = median(pct_Vehicle)
+            )
 
 # We use base_values$... to compare the scenario values with the corresponding base values data frame
 
@@ -206,19 +282,19 @@ scenario_values <- scenario_values %>%
          gge_color= ifelse(GGEPerChange > 0, "pos","neg"),
          gge_pct_text = paste('Scenario:', modelName, '\n', round(GGEPerChange, 2), '%'),
          gge_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_GGE, 2),
-                                                              scientific = F, 
-                                                              big.mark = ','), 'Gasoline gallone equiv.'),
+                                                               scientific = F, 
+                                                               big.mark = ','), 'Gasoline gallone equiv.'),
          kwh_color= ifelse(KWHPerChange > 0, "pos","neg"),
          kwh_pct_text = paste('Scenario:', modelName, '\n', round(KWHPerChange, 2), '%'),
          kwh_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_kWh, 2),
-                                                              scientific = F, 
-                                                              big.mark = ','), 'kWh'),
+                                                               scientific = F, 
+                                                               big.mark = ','), 'kWh'),
          co2_color= ifelse(CO2PerChange > 0, "pos","neg"),
          co2_pct_text = paste('Scenario:', modelName, '\n', round(CO2PerChange, 2), '%'),
          co2_text = paste('Scenario:', modelName, '\n', format(round(sum_Hh_CO2e, 2),
-                                                              scientific = F, 
-                                                              big.mark = ','), 'g CO[2] equivalent'))
-         
+                                                               scientific = F, 
+                                                               big.mark = ','), 'g CO[2] equivalent'))
+
 
 gp4 <- ggplot(scenario_values, aes(x = modelName, y = sum_Hh_GGE,
                                    text = gge_text)) + 
@@ -235,7 +311,7 @@ ggplotly(gp4, tooltip = 'text')
 gp5 <- ggplot(scenario_values, aes(x = modelName, y = GGEPerChange,
                                    text = gge_pct_text, fill = gge_color)) + 
   geom_bar(stat="identity") + theme_minimal() +
-     scale_fill_manual(values = c('midnightblue', 'tomato'),
+  scale_fill_manual(values = c('midnightblue', 'tomato'),
                     guide = F) +
   labs(title = "Regional daily gasoline gallon equivalents % Change", x = "Scenario", y = "GGE/Day")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -243,8 +319,8 @@ gp5 <- ggplot(scenario_values, aes(x = modelName, y = GGEPerChange,
 ggsave(file.path(fig_save, 'Regional_GGE_Percent_Change.jpeg'))
 
 ggplotly(gp5, tooltip = 'text')
-
 ```
+
 ### Energy consumption - electricity 
 
 ```{r household_kwh}
@@ -309,6 +385,81 @@ ggsave(file.path(fig_save, 'Regional_CO2e_Percent_Change.jpeg'))
 
 ggplotly(gp9, tooltip = 'text')
 
+
+```
+
+### Mode Choice
+
+```{r mode_choice}
+# ranking by  % vehicle trips
+
+mode_choice <- scenario_values %>%
+  select(modelName, contains('median_pct')) %>%
+  pivot_longer(cols = contains('median_pct'),
+               names_to = 'Mode',
+               values_to = 'median_pct') %>%
+  mutate(Mode = gsub('median_pct_', '', Mode))
+
+
+
+gp10 <- ggplot(mode_choice, aes(x = modelName, y = median_pct, fill = Mode)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Percent of household trips by mode", x = "Model Name", y ="Median % of trips by each mode") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+ggsave(file.path(fig_save, 'Mode_Choice.jpeg'))
+
+ggplotly(gp10)
+
+
+
+
+```
+
+
+### Ownership Costs
+
+
+```{r own_cost}
+gp11 <- ggplot(scenario_values, aes(x = reorder(modelName, median_OwnCost), y = median_OwnCost)) + 
+  geom_bar(stat="identity") + theme_minimal() +
+  labs(title = "Median vehicle ownership costs", x = "Model Name", y ="$ / household") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+ggsave(file.path(fig_save, 'Ownership_costs.jpeg'))
+
+ggplotly(gp11)
+```
+
+## Household level data table
+
+
+```{r hh_table}
+scenario_table <- scenario_values %>% select(names(scenario_values)[!grepl('_text', names(scenario_values)) &
+                                                 !grepl('_color', names(scenario_values))])
+
+val_length <- sapply(scenario_table, FUN = function(x) ifelse(is.numeric(x), max(nchar(as.character(round(x, 0)))),
+                                                           max(nchar(x))))
+
+datatable(scenario_table,
+          rownames = F,
+          filter = 'top',
+          extensions = c('Buttons','ColReorder', 'Select'),
+ options = list(
+   pageLength = 10,
+   dom = 'BSfrtip',
+   colReorder = TRUE,
+   select = TRUE,
+   search = list(regex = TRUE), # add regex searching to all search boxes
+   buttons = c('csv', 'excel', 'colvis'),
+   autoWidth = TRUE,
+   scrollX = TRUE, scrollY = 600)
+  ,
+ caption = "Summary of household level results for NVTA scenarios." ) %>%
+  formatRound(which(val_length >= 5 & !grepl('model', names(val_length))), 0) %>%
+  formatRound(which(val_length < 5 & !grepl('model', names(val_length))), 2)  
 
 ```
 
@@ -409,3 +560,11 @@ datatable(dvmt %>% select(-regDVMTAbsDif, -color, -pct_text, -mi_text) %>%
 
 ```
 
+```{r save}
+save(file = 'Final_NVTA_results.RData', 
+     list = c('marea_results',
+              'scenario_desc',
+              'scenario_values',
+              'hhfile'))
+
+```
