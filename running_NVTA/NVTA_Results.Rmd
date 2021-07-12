@@ -70,7 +70,7 @@ scenario_values <- scenario_values %>%
 
 ### Percent change 
 
-Across the study area, the largest DVMT changes in 2045 were observed for scenario K2 - Increasing Telecommuting, using the 'relative employment' input file in VisionEval to represent telecommuting. Interestingly, increases in DVMT were observed for the 'smaller families' scenario. Increases in DVMT were observed for the higher population growth scenario, which is as expected. 
+Across the study area, the largest DVMT changes in 2045 were observed for scenario K2 - Increasing Telecommuting, using the 'relative employment' input file in VisionEval to represent telecommuting. Increases in DVMT were observed for the 'larger families' scenario. Increases in DVMT were observed for the higher population growth scenario, which is as expected. 
 
 ```{r dvmt_rel}
 
@@ -142,7 +142,9 @@ ggplotly(gp2, tooltip = 'text')
 
 ### Truck energy usage relative change
 
-As with the DVMT values, just looking at energy usage for heavy trucks, the largest decrease was for scenario K2 - Increasing Telecommuting. This is worth noting because we would not necessarily expect heavy truck trips to be altered so much by telecommuting, so this deserves more investigation. Increases in heavy truck energy use were observed for the 'L3 - Smaller Families' scenario, which is not necessarily expected.  
+As with the DVMT values, just looking at energy usage for heavy trucks, the largest decrease was for scenario H2 - increasing hybrid and battery electric trucks. Substantial decreases were also observed for K2 - Increasing Telecommuting. This is worth noting because we would not necessarily expect heavy truck trips to be altered so much by telecommuting, so this deserves more investigation. Increases in heavy truck energy use were observed for the 'L3 - Larger Families' scenario.  
+
+The combination scenarios C02 and C05, which include the larger families as well as changes to employment, population, and fuels tax, had similar energy usage changes.
 
 ```{r truck_energy_rel}
 
@@ -338,6 +340,8 @@ ggplotly(gp6, tooltip = 'text')
 
 Again, scenario K2 - Increasing telecommuting had by far the biggest reduction in electricity use. 
 
+The combination scenarios C01 and CO4 both include the increased telecommuting scenario, along with electrification and increased funding to transit.
+
 ```{r household_kwh_pct}
 gp7 <- ggplot(scenario_values, aes(x = modelName, y = KWHPerChange,
                             text = kwh_pct_text, fill = kwh_color)) + 
@@ -371,6 +375,8 @@ ggplotly(gp8, tooltip = 'text')
 
 The largest changes in emissions, summed up from the household CO[2]e values, was under the scenario with increasing electrification (2 different levels of increase tested), with the very substantial reductions as well observed under the K2 - increasing telecommuting scenario. 
 
+The best combination (C01) includes G2 + H2 + K2, meaning increased household vehicle electrification, increase in hybrid heavy trucks, along with increased telecommuting.
+
 ```{r household_emissions_pct}
 gp9 <- ggplot(scenario_values, aes(x = modelName, y = CO2PerChange,
                             text = co2_pct_text, fill = co2_color)) + 
@@ -389,6 +395,8 @@ ggplotly(gp9, tooltip = 'text')
 ```
 
 ### Mode Choice
+
+The biggest reduction in vehicle usage (as measured by the median percent of trips at the household level for each of vehicle, bicycle, transit, and walking) was for the increased telecommuting scenario, along with the combination scenarios which included this telecommuting shift. 
 
 ```{r mode_choice}
 # ranking by  % vehicle trips
@@ -420,6 +428,7 @@ ggplotly(gp10)
 
 ### Ownership Costs
 
+The greatest reduction in the costs to households of vehicle ownership was from the aging in place scenario.
 
 ```{r own_cost}
 gp11 <- ggplot(scenario_values, aes(x = reorder(modelName, median_OwnCost), y = median_OwnCost)) + 
